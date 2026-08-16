@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 
 LLM_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$LLM_HOME/config/config.sh"
 
+mkdir -p $LLM_HOME/config
+mkdir -p $LLM_HOME/memory
+mkdir -p $LLM_HOME/models
+
+touch $MEMORY_DIR/memory.md
+
+source "$LLM_HOME/config/config.sh"
 
 check_dependency() {
     if command -v "$1" >/dev/null 2>&1; then

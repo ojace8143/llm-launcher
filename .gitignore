@@ -4,11 +4,8 @@ config/.configured
 # Models
 models/*.gguf
 
-# Personal memory/conversations
-memory/
-conversations/
-
 # llama.cpp build artifacts
+llama.cpp/
 llama.cpp/build/
 
 # General build artifacts
