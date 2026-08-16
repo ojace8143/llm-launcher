@@ -69,15 +69,26 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
                 make \
                 fzf
             ;;
-
         emerge)
-            sudo emerge --ask \
+            EMERGE_PACKAGES=()
+
+            for pkg in \
                 dev-vcs/git \
                 dev-build/cmake \
-                sys-devel/gcc \
-                sys-devel/make \
-                app-shells/fzf
-            ;;
+           sys-devel/gcc \
+            app-shells/fzf
+        do
+            if has_version "$pkg"; then
+                echo "$pkg already installed"
+            else
+                EMERGE_PACKAGES+=("$pkg")
+            fi
+        done
+
+        if [[ ${#EMERGE_PACKAGES[@]} -gt 0 ]]; then
+            sudo emerge --ask --oneshot "${EMERGE_PACKAGES[@]}"
+        fi
+        ;;
     esac
 
     check_dependency git
