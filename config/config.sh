@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-LLM_HOME="$HOME/llm"
+LLM_HOME="$HOME/llm-launcher"
 
 LLAMA_HOME="$LLM_HOME/llama.cpp"
 LLAMA_BIN="$LLAMA_HOME/build/bin/llama-cli"

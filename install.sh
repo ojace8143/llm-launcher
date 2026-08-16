@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 LLM_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-mkdir -p $LLM_HOME/config
-mkdir -p $LLM_HOME/memory
-mkdir -p $LLM_HOME/models
-
-touch $MEMORY_DIR/memory.md
+mkdir -p "$LLM_HOME/config"
+mkdir -p "$LLM_HOME/memory"
+mkdir -p "$LLM_HOME/models"
 
 source "$LLM_HOME/config/config.sh"
+
+touch "$MEMORY_DIR/memory.md"
+
 
 check_dependency() {
     if command -v "$1" >/dev/null 2>&1; then
@@ -22,8 +24,8 @@ check_dependency() {
 
 #install script
 
-export PATH="$HOME/llm:$PATH"
-chmod +x ~/llm/llm
+export PATH="$LLM_HOME:$PATH"
+chmod +x "$LLM_HOME/llm"
 
 if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
     # first-time setup
