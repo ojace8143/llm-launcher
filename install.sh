@@ -56,6 +56,7 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
             sudo xbps-install -y \
                 git \
                 cmake \
+                gcc \
                 fzf
             ;;
 
@@ -63,6 +64,7 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
             sudo pacman -Syu --needed \
                 git \
                 cmake \
+                gcc \
                 fzf
             ;;
         emerge)
@@ -89,9 +91,11 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
 
     check_dependency git
     check_dependency cmake
+    check_dependency gcc
     check_dependency fzf
 
-    if [[ ! -d "$LLAMA_HOME/CMakeLists.txt" ]]; then
+    if [[ ! -f "$LLAMA_HOME/CMakeLists.txt" ]]; then
+
         echo "llama.cpp not found."
         echo "Cloning llama.cpp..."
         git clone https://github.com/ggml-org/llama.cpp.git "$LLAMA_HOME"
@@ -130,6 +134,33 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
         "$EDITOR" "$MEMORY_FILE"
     fi
 
+    MODELS=("$MODEL_DIR"/*.gguf)
+
+    if [[ ! -e "${MODELS[0]}" ]]; then
+        echo "No GGUF models found"
+
+        DOWNLOAD_MODEL=$(printf '%s\n' Yes No |
+            fzf --height 40% --reverse --prompt="Download a default model? ")
+
+        if [[ "$DOWNLOAD_MODEL" == "Yes" ]]; then
+            curl -L -o "$MODEL_DIR/Qwen3VL-8B-Instruct-Q4_K_M.gguf" \
+                "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf"
+
+            DEFAULT_MODEL="Qwen3VL-8B-Instruct-Q4_K_M.gguf"
+
+            sed -i "s|^DEFAULT_MODEL=.*|DEFAULT_MODEL=\"$DEFAULT_MODEL\"|" \
+                "$LLM_HOME/config/config.sh"
+        else
+            sed -i 's|^DEFAULT_MODEL=.*|DEFAULT_MODEL=""|' \
+                "$LLM_HOME/config/config.sh"
+        fi
+    else
+        DEFAULT_MODEL=$(find "$MODEL_DIR" -maxdepth 1 -type f -name "*.gguf" -printf "%f\n" |
+            fzf --height 40% --reverse --prompt="Select default model: ")
+
+        sed -i "s|^DEFAULT_MODEL=.*|DEFAULT_MODEL=\"$DEFAULT_MODEL\"|" \
+            "$LLM_HOME/config/config.sh"
+    fi
 
     #marks as first time setup complete
     touch "$LLM_HOME/config/.configured"
