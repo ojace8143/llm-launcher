@@ -1,0 +1,19 @@
+# Local configuration
+config/.configured
+
+# Models
+models/*.gguf
+
+# Personal memory/conversations
+memory/
+conversations/
+
+# llama.cpp build artifacts
+llama.cpp/build/
+
+# General build artifacts
+*.o
+*.a
+*.so
+CMakeCache.txt
+CMakeFiles/

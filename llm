@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+LLM_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$LLM_HOME/config/config.sh"
+
+case "$1" in
+
+    help)
+        echo "Ran: llm help"
+        source $LLM_HOME/scripts/help.sh
+        ;;
+
+    config)
+        case "$2" in
+
+            show)
+                echo "Ran: llm config show"
+                source $LLM_HOME/scripts/configshow.sh
+                ;;
+
+            edit)
+                echo "Ran: llm config edit"
+                source $LLM_HOME/scripts/configedit.sh
+                ;;
+
+            "")
+                echo "Ran: llm config"
+                echo "Option not specified; usage: llm config [show|edit]"
+                ;;
+
+            *)
+                echo "Unknown config option: $2"
+                echo "Usage: llm config [show|edit]"
+                ;;
+
+        esac
+        ;;
+
+    launch)
+        case "$2" in
+
+            "")
+                echo "Ran: llm launch default"
+                source $LLM_HOME/scripts/launchdefault.sh
+                ;;
+
+            select)
+                echo "Ran: llm launch select"
+                source $LLM_HOME/scripts/launchselect.sh
+                ;;
+
+            *)
+                echo "Ran: llm launch $2"
+                #just launch the llm from here
+                ;;
+
+        esac
+        ;;
+
+    health)
+        echo "Ran: llm health"
+        source $LLM_HOME/scripts/health.sh
+        ;;
+
+    "")
+        echo "Usage: llm {help|config|launch|health}"
+        ;;
+
+    *)
+        echo "Unknown command: $1"
+        echo "Run 'llm help' for usage."
+        ;;
+
+esac
