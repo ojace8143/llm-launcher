@@ -56,8 +56,6 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
             sudo xbps-install -y \
                 git \
                 cmake \
-                gcc \
-                make \
                 fzf
             ;;
 
@@ -65,8 +63,6 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
             sudo pacman -Syu --needed \
                 git \
                 cmake \
-                gcc \
-                make \
                 fzf
             ;;
         emerge)
@@ -75,29 +71,27 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
             for pkg in \
                 dev-vcs/git \
                 dev-build/cmake \
-           sys-devel/gcc \
-            app-shells/fzf
-        do
-            if has_version "$pkg"; then
-                echo "$pkg already installed"
-            else
-                EMERGE_PACKAGES+=("$pkg")
-            fi
-        done
+                sys-devel/gcc \
+                app-shells/fzf
+            do
+                if emerge -q "$pkg"; then
+                    echo "$pkg already installed"
+                else
+                    EMERGE_PACKAGES+=("$pkg")
+                fi
+            done
 
-        if [[ ${#EMERGE_PACKAGES[@]} -gt 0 ]]; then
-            sudo emerge --ask --oneshot "${EMERGE_PACKAGES[@]}"
-        fi
-        ;;
-    esac
+            if [[ ${#EMERGE_PACKAGES[@]} -gt 0 ]]; then
+                sudo emerge --ask --oneshot "${EMERGE_PACKAGES[@]}"
+            fi
+            ;;
+        esac
 
     check_dependency git
     check_dependency cmake
-    check_dependency gcc
-    check_dependency make
     check_dependency fzf
 
-    if [[ ! -d "$LLAMA_HOME" ]]; then
+    if [[ ! -d "$LLAMA_HOME/CMakeLists.txt" ]]; then
         echo "llama.cpp not found."
         echo "Cloning llama.cpp..."
         git clone https://github.com/ggml-org/llama.cpp.git "$LLAMA_HOME"
@@ -107,18 +101,7 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
 
     cd "$LLAMA_HOME"
     cmake -B build
-
-    if [[ $? -ne 0 ]]; then
-        echo "CMake configuration failed; exiting"
-        exit 1
-    fi
-
     cmake --build build --config Release -j"$(nproc)"
-
-    if [[ $? -ne 0 ]]; then
-        echo "llama.cpp build failed; exiting"
-        exit 1
-    fi
 
     if [[ -x "$LLAMA_BIN" ]]; then
         echo "llama.cpp build completed; continuing"
