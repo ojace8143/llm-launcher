@@ -41,7 +41,12 @@ case "$1" in
 
             "")
                 echo "Ran: llm launch default"
-                source $LLM_HOME/scripts/launchdefault.sh
+                "$LLM_HOME/scripts/launchdefault.sh"
+                ;;
+
+                default)
+                    echo "Ran: llm launch default"
+                    "$LLM_HOME/scripts/launchdefault.sh"
                 ;;
 
             select)
