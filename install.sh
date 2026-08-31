@@ -99,11 +99,12 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
         echo "llama.cpp not found."
         echo "Cloning llama.cpp..."
         git clone https://github.com/ggml-org/llama.cpp.git "$LLAMA_HOME"
+
     else
         echo "llama.cpp already exists; continuing"
     fi
 
-    cd "$LLM_HOME"
+    cd "$LLAMA_HOME"
 
     echo ""
     echo "Select llama.cpp backend(s):"

@@ -8,8 +8,18 @@ MODEL="$(find "$MODEL_DIR" -maxdepth 1 -type f -name '*.gguf' -printf '%f\n' |
 
 [[ -z "$MODEL" ]] && exit 0
 
-"$LLAMA_BIN" \
-    -m "$MODEL_DIR/$MODEL" \
-    --device "$DEVICE" \
-    -ngl 99 \
+LLAMA_ARGS=(
+    -m "$MODEL_DIR/$MODEL"
+    -ngl 99
     -c 2048
+)
+
+if [[ -n "$DEVICE" ]]; then
+    LLAMA_ARGS+=(--device "$DEVICE")
+fi
+
+if [[ "$MEMORY_ENABLED" == "true" && -f "$MEMORY_FILE" ]]; then
+    LLAMA_ARGS+=(--system-prompt-file "$MEMORY_FILE")
+fi
+
+"$LLAMA_BIN" "${LLAMA_ARGS[@]}"

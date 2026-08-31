@@ -11,5 +11,7 @@ DEFAULT_MODEL="Qwen3-1.7B-Q4_K_M.gguf"
 
 MEMORY_DIR="$LLM_HOME/memory"
 MEMORY_FILE="$MEMORY_DIR/memory.md"
+MEMORY_ENABLED="true"
 
 DEVICE="Vulkan1"
+
