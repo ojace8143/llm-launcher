@@ -19,5 +19,6 @@ fi
 
 "$LLAMA_BIN" \
     -m "$MODEL" \
+    --device "$DEVICE" \
     -ngl 99 \
     -c 2048

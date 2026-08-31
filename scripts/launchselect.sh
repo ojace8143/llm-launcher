@@ -10,5 +10,6 @@ MODEL="$(find "$MODEL_DIR" -maxdepth 1 -type f -name '*.gguf' -printf '%f\n' |
 
 "$LLAMA_BIN" \
     -m "$MODEL_DIR/$MODEL" \
+    --device "$DEVICE" \
     -ngl 99 \
     -c 2048
