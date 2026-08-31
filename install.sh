@@ -103,8 +103,61 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
         echo "llama.cpp already exists; continuing"
     fi
 
-    cd "$LLAMA_HOME"
-    cmake -B build
+    cd "$LLM_HOME"
+
+    echo ""
+    echo "Select llama.cpp backend(s):"
+
+    BACKEND=$(printf '%s\n' \
+        "CPU" \
+        "CUDA" \
+        "Vulkan" \
+        "CUDA + Vulkan" |
+        fzf --height 40% --reverse --prompt="Backend: ")
+
+    case "$BACKEND" in
+        CPU)
+            CMAKE_ARGS=(
+                -DCMAKE_BUILD_TYPE=Release
+                -DGGML_CUDA=OFF
+                -DGGML_VULKAN=OFF
+            )
+            ;;
+
+        CUDA)
+            CMAKE_ARGS=(
+                -DCMAKE_BUILD_TYPE=Release
+                -DGGML_CUDA=ON
+            -DGGML_VULKAN=OFF
+            )
+            ;;
+
+        Vulkan)
+            CMAKE_ARGS=(
+                -DCMAKE_BUILD_TYPE=Release
+                -DGGML_CUDA=OFF
+                -DGGML_VULKAN=ON
+            )
+            ;;
+
+        "CUDA + Vulkan")
+            CMAKE_ARGS=(
+                -DCMAKE_BUILD_TYPE=Release
+                -DGGML_CUDA=ON
+                -DGGML_VULKAN=ON
+            )
+            ;;
+
+        *)
+            echo "No backend selected; exiting"
+            exit 1
+           ;;
+    esac
+
+    echo ""
+    echo "Configuring llama.cpp with: $BACKEND"
+
+    cmake -B build "${CMAKE_ARGS[@]}"
     cmake --build build --config Release -j"$(nproc)"
 
     if [[ -x "$LLAMA_BIN" ]]; then
