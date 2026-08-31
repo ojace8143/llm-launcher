@@ -7,9 +7,9 @@ LLAMA_BIN="$LLAMA_HOME/build/bin/llama-cli"
 
 MODEL_DIR="$LLM_HOME/models"
 
-DEFAULT_MODEL="SmolLM2-360M-Instruct-Q4_K_M.gguf"
+DEFAULT_MODEL="Qwen3-1.7B-Q4_K_M.gguf"
 
 MEMORY_DIR="$LLM_HOME/memory"
 MEMORY_FILE="$MEMORY_DIR/memory.md"
 
-DEVICE="CUDA0"
+DEVICE="Vulkan1"
