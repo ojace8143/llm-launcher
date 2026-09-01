@@ -40,6 +40,8 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
         PACKAGE_MANAGER="pacman"
     elif command -v emerge >/dev/null 2>&1; then
         PACKAGE_MANAGER="emerge"
+    elif command -v apt >/dev/null 2>&1; then
+        PACKAGE_MANAGER="apt-get"
     else
         echo ""
         echo "Unsupported package manager detected; check README.md for all dependencies and how to install"
@@ -86,6 +88,15 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
             if [[ ${#EMERGE_PACKAGES[@]} -gt 0 ]]; then
                 sudo emerge --ask --oneshot "${EMERGE_PACKAGES[@]}"
             fi
+            ;;
+
+        apt)
+            sudo apt-get update
+            sudo apt-get install -y \
+                git \
+                cmake \
+                gcc \
+                fzf
             ;;
         esac
 
