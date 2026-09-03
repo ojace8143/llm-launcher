@@ -29,7 +29,7 @@ case "$OPTION" in
         ;;
 
     "Context size")
-        echo "Context size configuration not implemented yet."
+        "$LLM_HOME"/scripts/configcontext.sh
         ;;
 
     "GPU layers")
