@@ -14,17 +14,14 @@ case "$1" in
         case "$2" in
 
             show)
-                echo "Ran: llm config show"
                 source $LLM_HOME/scripts/configshow.sh
                 ;;
 
             edit)
-                echo "Ran: llm config edit"
                 source $LLM_HOME/scripts/configedit.sh
                 ;;
 
             "")
-                echo "Ran: llm config"
                 echo "Option not specified; usage: llm config [show|edit]"
                 ;;
 
@@ -40,30 +37,24 @@ case "$1" in
         case "$2" in
 
             "")
-                echo "Ran: llm launch default"
                 "$LLM_HOME/scripts/launchdefault.sh"
                 ;;
 
                 default)
-                    echo "Ran: llm launch default"
                     "$LLM_HOME/scripts/launchdefault.sh"
                 ;;
 
             select)
-                echo "Ran: llm launch select"
                 source $LLM_HOME/scripts/launchselect.sh
                 ;;
 
             *)
-                echo "Ran: llm launch $2"
-                #just launch the llm from here
                 ;;
 
         esac
         ;;
 
     health)
-        echo "Ran: llm health"
         source $LLM_HOME/scripts/health.sh
         ;;
 

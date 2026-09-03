@@ -13,5 +13,5 @@ MEMORY_DIR="$LLM_HOME/memory"
 MEMORY_FILE="$MEMORY_DIR/memory.md"
 MEMORY_ENABLED="true"
 
-DEVICE="Vulkan1"
+DEVICE="CUDA0"
 
