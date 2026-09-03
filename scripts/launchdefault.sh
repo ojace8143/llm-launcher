@@ -20,15 +20,18 @@ fi
 LLAMA_ARGS=(
     -m "$MODEL"
     -ngl 99
-    -c 2048
+    -c "$CONTEXT_SIZE"
 )
 
 if [[ -n "$DEVICE" ]]; then
     LLAMA_ARGS+=(--device "$DEVICE")
 fi
 
-if [[ "$MEMORY_ENABLED" == "true" && -f "$MEMORY_FILE" ]]; then
+if [[  -f "$MEMORY_FILE" ]]; then
     LLAMA_ARGS+=(--system-prompt-file "$MEMORY_FILE")
+else
+    echo "MEMORY FILE NOT FOUND, EXITING"
+    exit 1
 fi
 
 "$LLAMA_BIN" "${LLAMA_ARGS[@]}"
