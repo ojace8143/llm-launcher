@@ -24,6 +24,7 @@ llm {config|launch}
 llm config {edit|show}
 llm launch *(Launches default model)
 llm launch select *(opens a fzf menu and you select a model which will be launched.)
+llm help (help text)
 ```
 
 ## Features
