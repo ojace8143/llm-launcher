@@ -12,11 +12,11 @@ and go through the prompts. You can change your models directory later, and inst
 ```bash
 sudo ln -s ~/llm-launcher/llm /usr/local/bin/llm
 ```
--# This will create a symlink so you can use the "llm" command anywhere.
+<small>This will create a symlink so you can use the "llm" command anywhere.</small>
 ```bash
 export PATH="$HOME/llm-launcher:$PATH"
 ```
--# This adds llm-launcher to your path
+<small>This adds llm-launcher to your path</small>
 
 ### Usage
 llm {config|launch}
