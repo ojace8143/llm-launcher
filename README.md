@@ -19,10 +19,12 @@ export PATH="$HOME/llm-launcher:$PATH"
 > *This adds llm-launcher to your path
 
 ### Usage
-> llm {config|launch}
-> llm config {edit|show}
-> llm launch *(Launches default model)
-> llm launch select *(opens a fzf menu and you select a model which will be launched.)
+```text
+llm {config|launch}
+llm config {edit|show}
+llm launch *(Launches default model)
+llm launch select *(opens a fzf menu and you select a model which will be launched.)
+```
 
 ## Features
 Automatic install, fzf menus. You can select a model directory, which gpu to use (if you have multiple), context size, default model, and more.
