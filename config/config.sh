@@ -10,7 +10,7 @@ MODEL_DIR="$LLM_HOME/models"
 DEFAULT_MODEL="Qwen3-1.7B-Q4_K_M.gguf"
 
 MEMORY_DIR="$LLM_HOME/memory"
-MEMORY_FILE="$MEMORY_DIR/default.md"
+MEMORY_FILE="/home/ojace8143/llm-launcher/memory/example.md"
 
 CONTEXT_SIZE="16384"
 

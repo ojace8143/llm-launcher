@@ -20,9 +20,6 @@ fi
 
 if [[ -f "$MEMORY_FILE" ]]; then
     LLAMA_ARGS+=(--system-prompt-file "$MEMORY_FILE")
-else
-    echo "MEMORY FILE NOT FOUND, EXITING"
-    exit 1
 fi
 
 "$LLAMA_BIN" "${LLAMA_ARGS[@]}"

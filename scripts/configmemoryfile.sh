@@ -4,9 +4,10 @@ LLM_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$LLM_HOME/config/config.sh"
 
 MEMORY_CHOICE="$(
-    printf '%s\n' \
-        blank.md \
-        default.md |
+    find "$MEMORY_DIR" \
+        -maxdepth 1 \
+        -type f \
+        -printf '%f\n' |
         fzf \
             --height 40% \
             --reverse \
