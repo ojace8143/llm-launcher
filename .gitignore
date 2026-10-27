@@ -1,5 +1,6 @@
 # Local configuration
 config/.configured
+config/config.local.sh
 
 # Models
 models/*.gguf

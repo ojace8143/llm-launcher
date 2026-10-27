@@ -1,70 +1,64 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-LLM_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERSION="0.2.0"
+
+# Resolve symlinks so `llm` works when linked into ~/.local/bin.
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+LLM_HOME="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+export LLM_HOME
+
+# shellcheck source=/dev/null
+source "$LLM_HOME/lib/common.sh"
+
+if [[ ! -f "$LLM_HOME/config/config.sh" ]]; then
+    die "Configuration not found. Run $LLM_HOME/setup.sh"
+fi
+# shellcheck source=/dev/null
 source "$LLM_HOME/config/config.sh"
 
-case "$1" in
+if [[ -z "${LLM_HOME:-}" || -z "${MODEL_DIR:-}" || -z "${LLAMA_BIN:-}" ]]; then
+    die "Configuration is incomplete (LLM_HOME/MODEL_DIR/LLAMA_BIN empty). Run $LLM_HOME/setup.sh"
+fi
 
-    help)
-        echo "Ran: llm help"
-        source $LLM_HOME/scripts/help.sh
-        ;;
+# Load every command module. Adding a command is just adding a file here.
+for cmd_file in "$LLM_HOME"/scripts/commands/*.sh; do
+    [[ -e "$cmd_file" ]] || continue
+    # shellcheck source=/dev/null
+    source "$cmd_file"
+done
 
-    config)
-        case "$2" in
+usage_short() {
+    cat <<EOF
+${BOLD}llm${NC} — llama.cpp launcher
 
-            show)
-                source $LLM_HOME/scripts/configshow.sh
-                ;;
+${DIM}Usage:${NC} llm <command> [subcommand] [options]
+${DIM}Run${NC} 'llm help' ${DIM}for the full command list.${NC}
+EOF
+}
 
-            edit)
-                source $LLM_HOME/scripts/configedit.sh
-                ;;
+main() {
+    local cmd="${1:-help}"
+    [[ $# -gt 0 ]] && shift
 
-            "")
-                echo "Option not specified; usage: llm config [show|edit]"
-                ;;
+    case "$cmd" in
+        -h|--help) cmd="help" ;;
+        -v|--version) cmd="version" ;;
+    esac
 
-            *)
-                echo "Unknown config option: $2"
-                echo "Usage: llm config [show|edit]"
-                ;;
+    if declare -F "cmd_$cmd" >/dev/null 2>&1; then
+        "cmd_$cmd" "$@"
+    else
+        err "Unknown command: $cmd"
+        echo
+        usage_short
+        exit 2
+    fi
+}
 
-        esac
-        ;;
-
-    launch)
-        case "$2" in
-
-            "")
-                "$LLM_HOME/scripts/launchdefault.sh"
-                ;;
-
-                default)
-                    "$LLM_HOME/scripts/launchdefault.sh"
-                ;;
-
-            select)
-                source $LLM_HOME/scripts/launchselect.sh
-                ;;
-
-            *)
-                ;;
-
-        esac
-        ;;
-
-    health)
-        source $LLM_HOME/scripts/health.sh
-        ;;
-
-    "")
-        echo "Usage: llm {help|config|launch|health}"
-        ;;
-
-    *)
-        echo "Unknown command: $1"
-        echo "Run 'llm help' for usage."
-        ;;
-
-esac
+main "$@"
