@@ -5,6 +5,10 @@ health check.
 
 I originally wrote this as a little tool for me to use personally, but I came back to this with my recent rediscovery with local llms. So I'm now beefing it up with Opencode (Mainly Big Pickle, Qwen3.8, and DeepSeek V4.1 Flash) Rest of README written mostly by DeepSeek.
 
+To clear things up: The actual llm backend was NOT created by me (it's llama.cpp). This is supposed to be a tool for quality of life and convenience, with configs and stuff.
+
+Note: original project was created a few months ago, and llama.cpp has progressed a lot, so this tool isn't as useful as it was back then.
+
 ## Requirements
 
 - Linux with a bash shell
