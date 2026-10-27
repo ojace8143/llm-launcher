@@ -57,6 +57,14 @@ cmd_health() {
         check_fail "llama-server not found: ${LLAMA_SERVER_BIN:-unset}"
     fi
 
+    if [[ -n "${CUDA_HOME:-}" ]]; then
+        if [[ -x "$CUDA_HOME/bin/nvcc" ]]; then
+            check_ok "CUDA toolkit found: $CUDA_HOME"
+        else
+            check_fail "CUDA_HOME is set but nvcc is missing: $CUDA_HOME/bin/nvcc"
+        fi
+    fi
+
     if [[ -n "${DEVICE:-}" ]]; then
         if validate_device_list "$DEVICE"; then
             check_ok "configured device(s) found: $DEVICE"

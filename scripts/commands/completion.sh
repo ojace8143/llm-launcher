@@ -21,7 +21,7 @@ _llm_complete() {
     fi
     case "${COMP_WORDS[1]}" in
         config)
-            COMPREPLY=( $(compgen -W "show edit get set unset reset path open check default device split tensor-split main-gpu context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp" -- "$cur") )
+            COMPREPLY=( $(compgen -W "show edit get set unset reset path open check default device split tensor-split main-gpu cuda context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp" -- "$cur") )
             ;;
         serve)
             COMPREPLY=( $(compgen -W "status stop logs restart --background --open --no-open --agent --tools --mcp --sandbox --model --host --port --api-key --workspace --no-ui --dry-run --device --split-mode --tensor-split --parallel --ctx --ngl" -- "$cur") )
@@ -64,7 +64,7 @@ _llm() {
         return
     fi
     case "${words[2]}" in
-        config) _values 'config' show edit get set unset reset path open check default device split tensor-split main-gpu context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp ;;
+        config) _values 'config' show edit get set unset reset path open check default device split tensor-split main-gpu cuda context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp ;;
         models) _values 'models' list default info add remove download ;;
         serve) _values 'serve' status stop logs restart --background --open --agent --tools --model --host --port --workspace --mcp --sandbox --no-ui --dry-run ;;
         agent) _values 'agent' --workspace --shell --full --tools --mcp --sandbox --model --port --host --no-open --background --dry-run ;;

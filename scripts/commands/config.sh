@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # `llm config` — view and change configuration.
 
-CONFIG_KEYS="DEFAULT_MODEL MODEL_DIR LLAMA_HOME LLAMA_BIN LLAMA_SERVER_BIN MEMORY_DIR MEMORY_FILE MEMORY_ENABLED CONTEXT_SIZE NGL THREADS THREADS_BATCH FLASH_ATTN PARALLEL TEMP TOP_P EXTRA_ARGS DEVICE SPLIT_MODE TENSOR_SPLIT MAIN_GPU FIT SERVER_HOST SERVER_PORT SERVER_API_KEY SERVER_TOOLS SERVER_AGENT AGENT_WORKSPACE MCP_CONFIG RUN_DIR LOG_DIR"
+CONFIG_KEYS="DEFAULT_MODEL MODEL_DIR LLAMA_HOME LLAMA_BIN LLAMA_SERVER_BIN CUDA_HOME MEMORY_DIR MEMORY_FILE MEMORY_ENABLED CONTEXT_SIZE NGL THREADS THREADS_BATCH FLASH_ATTN PARALLEL TEMP TOP_P EXTRA_ARGS DEVICE SPLIT_MODE TENSOR_SPLIT MAIN_GPU FIT SERVER_HOST SERVER_PORT SERVER_API_KEY SERVER_TOOLS SERVER_AGENT AGENT_WORKSPACE MCP_CONFIG RUN_DIR LOG_DIR"
 
 cmd_config() {
     local sub="${1:-}"
@@ -23,6 +23,7 @@ cmd_config() {
         split|split-mode) config_split ;;
         tensor-split) config_tensor_split ;;
         main-gpu) config_main_gpu ;;
+        cuda) config_cuda_home ;;
         context) config_context ;;
         ngl) config_ngl ;;
         threads) config_threads ;;
@@ -122,6 +123,7 @@ config_show() {
     config_row "llama.cpp" "${LLAMA_HOME:-unset}"
     config_row "llama-cli" "${LLAMA_BIN:-unset}"
     config_row "llama-server" "${LLAMA_SERVER_BIN:-unset}"
+    config_row "CUDA toolkit" "${CUDA_HOME:-(system/default)}"
     config_row "Run dir" "${RUN_DIR:-unset}"
     config_row "Log dir" "${LOG_DIR:-unset}"
 }
@@ -143,6 +145,7 @@ config_edit() {
                 "GPU: tensor split" \
                 "GPU: main GPU" \
                 "GPU: fit" \
+                "GPU: CUDA toolkit path" \
                 "Generation: temperature" \
                 "Generation: top-p" \
                 "Generation: parallel sequences" \
@@ -171,6 +174,7 @@ config_edit() {
             "GPU: tensor split") config_tensor_split ;;
             "GPU: main GPU") config_main_gpu ;;
             "GPU: fit") config_fit ;;
+            "GPU: CUDA toolkit path") config_cuda_home ;;
             "Generation: temperature") config_temp ;;
             "Generation: top-p") config_top_p ;;
             "Generation: parallel sequences") config_parallel ;;
@@ -276,6 +280,12 @@ _validate_set() {
                     err "Memory file not found: $path"
                     return 2
                 }
+            fi
+            ;;
+        CUDA_HOME)
+            if [[ -n "$value" && ! -x "$value/bin/nvcc" ]]; then
+                err "No nvcc found at $value/bin/nvcc"
+                return 2
             fi
             ;;
         SERVER_API_KEY)
@@ -551,6 +561,19 @@ config_main_gpu() {
     info "Main GPU set to: $value"
 }
 
+config_cuda_home() {
+    local value
+    value="$(prompt_value "CUDA toolkit path (empty = system default)" "${CUDA_HOME:-}")"
+    if [[ -n "$value" ]]; then
+        [[ -x "$value/bin/nvcc" ]] || {
+            err "No nvcc found at $value/bin/nvcc"
+            return 2
+        }
+    fi
+    config_set CUDA_HOME "$value"
+    info "CUDA toolkit set to: ${value:-(system/default)}"
+}
+
 config_context() {
     require_fzf
     local selection
@@ -785,6 +808,7 @@ ${BOLD}Shortcuts${NC}
   llm config split                Split mode
   llm config tensor-split         Tensor split
   llm config main-gpu             Main GPU index
+  llm config cuda                 CUDA toolkit path
   llm config context              Context size
   llm config ngl                  GPU layers
   llm config threads              CPU threads
