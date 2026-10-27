@@ -51,21 +51,26 @@ cmd_health() {
         check_fail "default model missing: $DEFAULT_MODEL"
     fi
 
+    if [[ -x "${LLAMA_SERVER_BIN:-}" ]]; then
+        check_ok "llama-server found: $LLAMA_SERVER_BIN"
+    else
+        check_fail "llama-server not found: ${LLAMA_SERVER_BIN:-unset}"
+    fi
+
     if [[ -n "${DEVICE:-}" ]]; then
-        if [[ -x "${LLAMA_BIN:-}" ]] &&
-            "$LLAMA_BIN" --list-devices 2>/dev/null | awk -v d="$DEVICE" '
-                /^[[:space:]]+[A-Za-z0-9_.-]+:/ {
-                    gsub(/^[[:space:]]+/, ""); sub(/:.*/, "");
-                    if ($0 == d) found = 1
-                }
-                END { exit(found ? 0 : 1) }
-            '; then
-            check_ok "configured device found: $DEVICE"
+        if validate_device_list "$DEVICE"; then
+            check_ok "configured device(s) found: $DEVICE"
         else
             check_fail "configured device not found: $DEVICE"
         fi
     else
         check_ok "device selection: CPU / auto"
+    fi
+
+    if validate_gpu_config; then
+        check_ok "GPU settings valid (split: ${SPLIT_MODE:-layer})"
+    else
+        check_fail "invalid GPU settings"
     fi
 
     if [[ "${MEMORY_ENABLED:-false}" == "true" ]]; then
@@ -90,6 +95,26 @@ cmd_health() {
         check_ok "local config not created yet (using defaults)"
     fi
 
+    if [[ -n "${MCP_CONFIG:-}" ]]; then
+        if [[ -f "$MCP_CONFIG" ]]; then
+            check_ok "MCP config found: $MCP_CONFIG"
+        else
+            check_fail "MCP config missing: $MCP_CONFIG"
+        fi
+    fi
+
+    if [[ -n "${AGENT_WORKSPACE:-}" ]]; then
+        if [[ -d "$AGENT_WORKSPACE" ]]; then
+            check_ok "agent workspace found: $AGENT_WORKSPACE"
+        else
+            check_fail "agent workspace missing: $AGENT_WORKSPACE"
+        fi
+    fi
+
+    if [[ -f "${RUN_DIR:-$LLM_HOME/run}/server.pid" ]]; then
+        check_ok "background server PID file present"
+    fi
+
     echo
     if (( failures == 0 )); then
         printf '%sAll health checks passed.%s\n' "$GREEN" "$NC"
@@ -108,9 +133,10 @@ help_health() {
     cat <<EOF
 ${BOLD}llm health${NC}
 
-Check that the configuration, llama.cpp binary, models, device,
-memory file, and fzf are all usable.
+Check the configuration, llama.cpp binaries, models, devices,
+multi-GPU split settings, memory file, server paths, and fzf.
 
   llm health        Run checks (exit 1 if any fail)
+  llm config check  Configuration-only checks
 EOF
 }

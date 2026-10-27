@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "example": {
+      "command": "/path/to/mcp-server",
+      "args": [],
+      "env": {},
+      "timeout_ms": 30000
+    }
+  }
+}

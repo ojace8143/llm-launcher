@@ -8,10 +8,16 @@ cmd_version() {
     fi
 
     printf 'llm-launcher %s\n' "$VERSION"
-    printf '  LLM_HOME    %s\n' "$LLM_HOME"
-    printf '  llama.cpp   %s\n' "$llama_version"
-    printf '  llama-cli   %s\n' "${LLAMA_BIN:-unset}"
-    printf '  config      %s\n' "$LLM_CONFIG"
+    printf '  LLM_HOME      %s\n' "$LLM_HOME"
+    printf '  llama.cpp     %s\n' "$llama_version"
+    printf '  llama-cli     %s\n' "${LLAMA_BIN:-unset}"
+    printf '  llama-server  %s\n' "${LLAMA_SERVER_BIN:-unset}"
+    printf '  config        %s\n' "$LLM_CONFIG"
+    if have_cmd "${LLAMA_SERVER_BIN:-}" && "${LLAMA_SERVER_BIN}" --help 2>&1 | grep -q -- "--tools"; then
+        printf '  agent tools   supported\n'
+    else
+        printf '  agent tools   unavailable\n'
+    fi
 }
 
 help_version() {

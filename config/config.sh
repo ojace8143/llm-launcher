@@ -15,6 +15,7 @@ fi
 # Derived defaults (only applied when not overridden)
 : "${LLAMA_HOME:=$LLM_HOME/llama.cpp}"
 : "${LLAMA_BIN:=$LLAMA_HOME/build/bin/llama-cli}"
+: "${LLAMA_SERVER_BIN:=$LLAMA_HOME/build/bin/llama-server}"
 
 : "${MODEL_DIR:=$LLM_HOME/models}"
 
@@ -23,13 +24,61 @@ fi
 : "${MEMORY_DIR:=$LLM_HOME/memory}"
 : "${MEMORY_FILE:=$MEMORY_DIR/memory.md}"
 
+# Generation
 : "${CONTEXT_SIZE:=16384}"
 : "${NGL:=99}"
+: "${THREADS:=}"
+: "${THREADS_BATCH:=}"
+: "${FLASH_ATTN:=auto}"
+: "${PARALLEL:=1}"
+: "${TEMP:=}"
+: "${TOP_P:=}"
+: "${EXTRA_ARGS:=}"
 
+# Devices / multi-GPU
 : "${DEVICE:=}"
+: "${SPLIT_MODE:=layer}"
+: "${TENSOR_SPLIT:=}"
+: "${MAIN_GPU:=0}"
+: "${FIT:=}"
+
 : "${MEMORY_ENABLED:=false}"
+
+# Server / agent
+: "${SERVER_HOST:=127.0.0.1}"
+: "${SERVER_PORT:=9931}"
+: "${SERVER_API_KEY:=}"
+: "${SERVER_TOOLS:=}"
+: "${SERVER_AGENT:=false}"
+: "${AGENT_WORKSPACE:=}"
+: "${MCP_CONFIG:=}"
+
+: "${RUN_DIR:=$LLM_HOME/run}"
+: "${LOG_DIR:=$LLM_HOME/logs}"
 
 # Allow MEMORY_FILE to be stored as a bare filename.
 if [[ -n "${MEMORY_FILE:-}" && "$MEMORY_FILE" != /* ]]; then
     MEMORY_FILE="$MEMORY_DIR/$MEMORY_FILE"
 fi
+
+# Environment overrides: LLM_* beats config.local.sh, CLI flags beat these.
+apply_env_override() {
+    local env_name="$1" target="$2"
+    if [[ -n "${!env_name-}" ]]; then
+        printf -v "$target" '%s' "${!env_name}"
+    fi
+    return 0
+}
+
+apply_env_override LLM_MODEL DEFAULT_MODEL
+apply_env_override LLM_CTX CONTEXT_SIZE
+apply_env_override LLM_NGL NGL
+apply_env_override LLM_DEVICE DEVICE
+apply_env_override LLM_SPLIT SPLIT_MODE
+apply_env_override LLM_TENSOR_SPLIT TENSOR_SPLIT
+apply_env_override LLM_MAIN_GPU MAIN_GPU
+apply_env_override LLM_THREADS THREADS
+apply_env_override LLM_TEMP TEMP
+apply_env_override LLM_HOST SERVER_HOST
+apply_env_override LLM_PORT SERVER_PORT
+unset -f apply_env_override

@@ -362,6 +362,7 @@ setup_llama() {
             info "Skipping build."
             warn "The selected backend was not rebuilt; the existing binary is unchanged."
             warn "Use './setup.sh --fresh --backend=$backend' to rebuild it."
+            configure_gpu_choice
             return 0
         fi
     fi
@@ -385,6 +386,72 @@ setup_llama() {
     else
         die "llama-cli was not produced at $llama_bin"
     fi
+
+    configure_gpu_choice
+}
+
+# Optionally configure device selection and multi-GPU splitting.
+configure_gpu_choice() {
+    local -a rows=()
+    mapfile -t rows < <(llama_devices)
+    if (( ${#rows[@]} == 0 )); then
+        info "No GPU devices reported; using CPU."
+        return 0
+    fi
+
+    subsection "Detected devices"
+    local row id desc free total
+    for row in "${rows[@]}"; do
+        IFS=$'\t' read -r id desc free total <<<"$row"
+        info "  $id: $desc"
+    done
+
+    if [[ "$(ask_yesno "Configure GPU devices now?" No)" != "Yes" ]]; then
+        return 0
+    fi
+
+    local -a choices=()
+    for row in "${rows[@]}"; do
+        IFS=$'\t' read -r id desc free total <<<"$row"
+        choices+=("$id|$desc")
+    done
+
+    local -a selection=()
+    if interactive && have_cmd fzf; then
+        mapfile -t selection < <(
+            printf '%s\n' "${choices[@]}" |
+                fzf --multi --height 40% --reverse --border --prompt="Devices (TAB to select)> " || true
+        )
+    else
+        selection=("${choices[0]}")
+    fi
+    (( ${#selection[@]} > 0 )) || return 0
+
+    local -a ids=()
+    local choice
+    for choice in "${selection[@]}"; do
+        ids+=("${choice%%|*}")
+    done
+
+    local joined
+    local IFS=','
+    joined="${ids[*]}"
+    config_set DEVICE "$joined"
+    info "Devices set to: $joined"
+
+    if (( ${#ids[@]} > 1 )); then
+        local split
+        split="$(menu "Split mode" layer row tensor none)"
+        [[ -n "$split" ]] || split="layer"
+        config_set SPLIT_MODE "$split"
+        info "Split mode set to: $split"
+
+        local auto
+        if auto="$(auto_tensor_split "$joined")" && [[ -n "$auto" ]]; then
+            config_set TENSOR_SPLIT "$auto"
+            info "Tensor split set from VRAM: $auto"
+        fi
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -400,12 +467,23 @@ configure_env() {
     fi
 
     subsection "Long-term memory"
-    if [[ "$(ask_yesno "Enable the long-term memory file?" No)" == "Yes" ]]; then
-        mkdir -p "${MEMORY_DIR:-$LLM_HOME/memory}"
-        touch "${MEMORY_DIR:-$LLM_HOME/memory}/memory.md"
-        config_set MEMORY_FILE "memory.md"
+    local mem_default="No"
+    [[ "${MEMORY_ENABLED:-false}" == "true" ]] && mem_default="Yes"
+    if [[ "$(ask_yesno "Enable the long-term memory file?" "$mem_default")" == "Yes" ]]; then
+        local mem_dir="${MEMORY_DIR:-$LLM_HOME/memory}"
+        local mem_file="${MEMORY_FILE:-$mem_dir/memory.md}"
+        mkdir -p "$mem_dir"
+        if [[ ! -f "$mem_file" ]]; then
+            mem_file="$mem_dir/memory.md"
+            touch "$mem_file"
+        fi
+        if [[ "$mem_file" == "$mem_dir/"* ]]; then
+            config_set MEMORY_FILE "${mem_file##*/}"
+        else
+            config_set MEMORY_FILE "$mem_file"
+        fi
         config_set MEMORY_ENABLED "true"
-        info "Memory enabled: ${MEMORY_DIR:-$LLM_HOME/memory}/memory.md"
+        info "Memory enabled: $mem_file"
     else
         config_set MEMORY_ENABLED "false"
         info "Long-term memory disabled"

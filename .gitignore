@@ -1,6 +1,15 @@
 # Local configuration
 config/.configured
 config/config.local.sh
+config/config.local.sh.bak.*
+
+# Per-model profiles (keep the example)
+config/profiles/*.sh
+!config/profiles/example.sh
+
+# Run state
+run/
+logs/
 
 # Models
 models/*.gguf

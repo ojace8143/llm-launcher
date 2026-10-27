@@ -29,6 +29,7 @@ The setup script:
 - installs missing base packages (asks first)
 - clones and builds llama.cpp
 - lets you choose CPU, CUDA, Vulkan, or CUDA + Vulkan
+- optionally configures single-GPU or multi-GPU device selection
 - writes your personal settings to `config/config.local.sh` (gitignored)
 - optionally downloads a default model (Qwen 8b Instruct)
 - offers to symlink `llm` into `~/.local/bin`
@@ -58,23 +59,30 @@ llm help <command>           Help for one command
 
 llm launch                   Launch the default model
 llm launch select            Pick a model with fzf
-llm launch <model>           Launch a model by filename
+llm launch <model>           Launch by full or partial model name
 llm launch <model> -- ...    Pass extra flags to llama-cli
+llm launch --dry-run         Print the command without running it
 
-llm config show              Show the effective configuration
+llm config show [--json]     Show the effective configuration
 llm config edit              Interactive configuration menu
+llm config get <key>         Print a value
 llm config set <key> <val>   Set a value
-llm config default           Choose the default model
-llm config device            Choose the GPU/device
-llm config context           Choose the context size
-llm config ngl               Choose GPU layers offloaded
-llm config memory            Choose the long-term memory file
+llm config unset <key>       Remove an override
+llm config reset             Reset local config (backs up first)
+llm config check             Validate the configuration
 
 llm health                   Check the installation
 llm version                  Show version and paths
 
+llm devices                  List GPUs and free VRAM
+llm serve                    Run llama-server (OpenAI-compatible API + UI)
+llm agent                    Web UI agent with read/search/edit tools
+
 llm models list              List local models
+llm models info <name>       Show size/path/profile
+llm models add <path>        Add a .gguf to the models directory
 llm models download <url>    Download a .gguf file
+llm completion bash|zsh      Print shell completion
 llm setup                    Run the setup script
 ```
 
@@ -99,19 +107,120 @@ ln -sf "$PWD/llm" ~/.local/bin/llm
 Make sure `~/.local/bin` is in your `PATH`. `llm` resolves symlinks, so it
 works when linked.
 
+## Multi-GPU
+
+List devices and their free memory:
+
+```bash
+llm devices
+```
+
+Select one or more devices with fzf (TAB multi-selects):
+
+```bash
+llm config device
+```
+
+Then choose how layers are split:
+
+```bash
+llm config split          # none | layer | row | tensor
+llm config tensor-split   # auto (by free VRAM) | even | manual
+llm config main-gpu
+```
+
+`llm config device` automatically writes a VRAM-proportional tensor split when
+more than one device is selected. You can also set everything directly:
+
+```bash
+llm config set DEVICE "CUDA0,CUDA1"
+llm config set SPLIT_MODE layer
+llm config set TENSOR_SPLIT "3,1"
+```
+
+One-off launches:
+
+```bash
+llm launch --device CUDA0,CUDA1 --split-mode layer
+llm launch --dry-run        # verify the generated flags
+```
+
+## Server mode
+
+`llm serve` starts `llama-server` with the same model and GPU settings:
+
+```bash
+llm serve                      # foreground
+llm serve --background         # background
+llm serve status
+llm serve logs -f
+llm serve stop
+```
+
+The server listens on `127.0.0.1:9931` by default and exposes an
+OpenAI-compatible API at `/v1`, plus the llama.cpp Web UI.
+
+```bash
+curl http://127.0.0.1:9931/v1/models
+```
+
+This endpoint can be used by other agent harnesses (for example OpenCode) as a
+local OpenAI-compatible provider.
+
+## Agent mode
+
+`llm agent` starts the server with llama.cpp's built-in file tools and opens
+the Web UI:
+
+```bash
+llm agent
+llm agent --workspace ~/Projects/my-app
+llm agent --shell                 # also allow shell commands
+llm agent --sandbox docker:ubuntu # run tools in a container
+llm agent --mcp config/mcp.example.json
+```
+
+By default the agent can read files, search with glob/grep, write files, and
+edit files. Shell execution is opt-in.
+
+> **Security:** `--agent`/`--tools` grant file read/write access. The server
+> binds to loopback by default. Set `SERVER_API_KEY` before binding to a
+> non-loopback address.
+
+MCP servers can add tools. See `config/mcp.example.json`.
+
 ## Configuration
 
 - `config/config.sh` contains defaults and is never edited by the tools.
 - `config/config.local.sh` contains your settings and is gitignored.
 - Set values with `llm config set KEY VALUE` or edit them through
   `llm config edit`.
+- Per-model overrides live in `config/profiles/<model>.sh` (gitignored; see
+  `config/profiles/example.sh`).
 
 Useful keys:
 
 ```text
-DEFAULT_MODEL  MODEL_DIR     LLAMA_BIN     LLAMA_HOME
-MEMORY_DIR     MEMORY_FILE   MEMORY_ENABLED
-CONTEXT_SIZE   NGL           DEVICE
+DEFAULT_MODEL  MODEL_DIR       LLAMA_BIN        LLAMA_SERVER_BIN
+MEMORY_DIR     MEMORY_FILE     MEMORY_ENABLED
+CONTEXT_SIZE   NGL             THREADS          FLASH_ATTN
+DEVICE         SPLIT_MODE      TENSOR_SPLIT     MAIN_GPU
+SERVER_HOST    SERVER_PORT     SERVER_API_KEY
+SERVER_TOOLS   AGENT_WORKSPACE MCP_CONFIG
+```
+
+Environment overrides are available for temporary changes:
+`LLM_MODEL`, `LLM_CTX`, `LLM_NGL`, `LLM_DEVICE`, `LLM_SPLIT`,
+`LLM_TENSOR_SPLIT`, `LLM_THREADS`, `LLM_TEMP`, `LLM_HOST`, `LLM_PORT`.
+
+## Shell completion
+
+```bash
+# bash
+llm completion bash > ~/.local/share/bash-completion/completions/llm
+
+# zsh
+llm completion zsh > "${fpath[1]}/_llm"
 ```
 
 ## Troubleshooting
@@ -120,11 +229,21 @@ CONTEXT_SIZE   NGL           DEVICE
 llm health
 ```
 
-This checks the configuration, llama.cpp binary, models, device, memory file,
-and fzf. Re-run `./setup.sh` if a path or build is missing.
+This checks the configuration, llama.cpp binaries, models, devices, GPU split
+settings, memory file, server/agent paths, and fzf. Also run:
+
+```bash
+llm config check
+llm devices
+```
+
+Re-run `./setup.sh` if a path or build is missing.
 
 ## Notes
 
 Backend selection is per build. Switching backends reuses the same
 `llama.cpp/build` directory; use `./setup.sh --fresh` if CMake keeps stale
 settings.
+
+Device selection depends on the built backend. A CPU-only build reports no
+devices, so `llm devices` will be empty.
