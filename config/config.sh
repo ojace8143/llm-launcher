@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 
-LLM_HOME="$HOME/llm-launcher"
+CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LLM_HOME="$(cd "$CONFIG_DIR/.." && pwd)"
 
 LLAMA_HOME="$LLM_HOME/llama.cpp"
 LLAMA_BIN="$LLAMA_HOME/build/bin/llama-cli"
 
 MODEL_DIR="$LLM_HOME/models"
 
-DEFAULT_MODEL="Qwen3-1.7B-Q4_K_M.gguf"
+DEFAULT_MODEL="${DEFAULT_MODEL:-}"
 
 MEMORY_DIR="$LLM_HOME/memory"
-MEMORY_FILE="/home/ojace8143/llm-launcher/memory/example.md"
+MEMORY_FILE="$MEMORY_DIR/example.md"
 
 CONTEXT_SIZE="16384"
 
-DEVICE="CUDA0"
+DEVICE=""
 

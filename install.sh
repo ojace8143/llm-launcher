@@ -40,12 +40,14 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
         PACKAGE_MANAGER="pacman"
     elif command -v emerge >/dev/null 2>&1; then
         PACKAGE_MANAGER="emerge"
+    elif command -v apt-get >/dev/null 2>&1; then
+        PACKAGE_MANAGER="apt"
     elif command -v apt >/dev/null 2>&1; then
-        PACKAGE_MANAGER="apt-get"
+        PACKAGE_MANAGER="apt"
     else
         echo ""
         echo "Unsupported package manager detected; check README.md for all dependencies and how to install"
-        echo "Supported package managers: xbps, pacman, emerge"
+        echo "Supported package managers: xbps, pacman, emerge, apt/apt-get"
         exit 1
     fi
 
@@ -179,9 +181,15 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
         exit 1
     fi
 
-    EDITOR=$(printf '%s\n' nvim vim vi nano | 
+    EDITOR=$(printf '%s\n' nvim vim vi nano |
         fzf --height 40% --reverse --prompt="Select editor: ")
-    echo "EDITOR=\"$EDITOR\"" >> "$LLM_HOME/config/config.sh"
+    if [[ -n "$EDITOR" ]]; then
+        if grep -q '^EDITOR=' "$LLM_HOME/config/config.sh"; then
+            sed -i "s|^EDITOR=.*|EDITOR=\"$EDITOR\"|" "$LLM_HOME/config/config.sh"
+        else
+            echo "EDITOR=\"$EDITOR\"" >> "$LLM_HOME/config/config.sh"
+        fi
+    fi
 
     MEMORY_ENABLED=$(printf '%s\n' Yes No |
         fzf --height 40% --reverse --prompt="Use Long Term Memory File?")
@@ -189,19 +197,28 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
     case "$MEMORY_ENABLED" in
         Yes) MEMORY_ENABLED=true ;;
         No) MEMORY_ENABLED=false ;;
+        *) MEMORY_ENABLED=false ;;
     esac
 
-    echo "MEMORY_ENABLED=\"$MEMORY_ENABLED\"" >> "$LLM_HOME/config/config.sh"
+    if grep -q '^MEMORY_ENABLED=' "$LLM_HOME/config/config.sh"; then
+        sed -i "s|^MEMORY_ENABLED=.*|MEMORY_ENABLED=\"$MEMORY_ENABLED\"|" "$LLM_HOME/config/config.sh"
+    else
+        echo "MEMORY_ENABLED=\"$MEMORY_ENABLED\"" >> "$LLM_HOME/config/config.sh"
+    fi
 
-    if [[ "$MEMORY_ENABLED" == "true" ]]; then
+    if [[ "$MEMORY_ENABLED" == "true" && -n "${EDITOR:-}" ]]; then
         echo "editing default long term memory file"
-        sleep 5s
+        sleep 2s
+        mkdir -p "$(dirname "$MEMORY_FILE")"
+        touch "$MEMORY_FILE"
         "$EDITOR" "$MEMORY_FILE"
     fi
 
+    shopt -s nullglob
     MODELS=("$MODEL_DIR"/*.gguf)
+    shopt -u nullglob
 
-    if [[ ! -e "${MODELS[0]}" ]]; then
+    if (( ${#MODELS[@]} == 0 )); then
         echo "No GGUF models found"
 
         DOWNLOAD_MODEL=$(printf '%s\n' Yes No |
@@ -223,8 +240,12 @@ if [[ ! -f "$LLM_HOME/config/.configured" ]]; then
         DEFAULT_MODEL=$(find "$MODEL_DIR" -maxdepth 1 -type f -name "*.gguf" -printf "%f\n" |
             fzf --height 40% --reverse --prompt="Select default model: ")
 
-        sed -i "s|^DEFAULT_MODEL=.*|DEFAULT_MODEL=\"$DEFAULT_MODEL\"|" \
-            "$LLM_HOME/config/config.sh"
+        if [[ -n "$DEFAULT_MODEL" ]]; then
+            sed -i "s|^DEFAULT_MODEL=.*|DEFAULT_MODEL=\"$DEFAULT_MODEL\"|" \
+                "$LLM_HOME/config/config.sh"
+        else
+            echo "No model selected."
+        fi
     fi
 
     #marks as first time setup complete
