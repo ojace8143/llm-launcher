@@ -3,7 +3,7 @@
 A small llama.cpp launcher with an fzf interface, per-model settings, and a
 health check.
 
-I originally wrote this as a little tool for me to use personally, but I came back to this with my recent sort of rediscovery with local llms. So I'm now beefing it up with Opencode (Mainly Big Pickle, Qwen3.8, and DeepSeek V4.1 Flash)
+I originally wrote this as a little tool for me to use personally, but I came back to this with my recent rediscovery with local llms. So I'm now beefing it up with Opencode (Mainly Big Pickle, Qwen3.8, and DeepSeek V4.1 Flash) Rest of README written mostly by DeepSeek.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ I originally wrote this as a little tool for me to use personally, but I came ba
 - Optional: CUDA toolkit (`nvcc`) and/or a Vulkan runtime for GPU builds
 
 `setup.sh` can install the basic dependencies on xbps, pacman, emerge, and
-apt-based systems.
+apt-based systems. (More support should come later)
 
 ## Setup
 
@@ -26,8 +26,9 @@ The setup script:
 - clones and builds llama.cpp
 - lets you choose CPU, CUDA, Vulkan, or CUDA + Vulkan
 - writes your personal settings to `config/config.local.sh` (gitignored)
-- optionally downloads a default model
+- optionally downloads a default model (Qwen 8b Instruct)
 - offers to symlink `llm` into `~/.local/bin`
+- non interactive setup if you so desire
 
 Non-interactive example:
 
