@@ -107,6 +107,38 @@ ln -sf "$PWD/llm" ~/.local/bin/llm
 Make sure `~/.local/bin` is in your `PATH`. `llm` resolves symlinks, so it
 works when linked.
 
+## CUDA toolkit outside the package manager
+
+If `nvcc` is not available from your distro repositories, install the NVIDIA
+runfile toolkit somewhere user-writable (for example `~/Src/cuda-13.2.2`):
+
+```bash
+CUDA_VERSION=13.2.2
+CUDA_RUNFILE=cuda_${CUDA_VERSION}_595.71.05_linux.run
+
+mkdir -p ~/Src
+cd ~/Src
+curl -fLO "https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/local_installers/${CUDA_RUNFILE}"
+
+# --silent implies EULA acceptance; --toolkit skips the driver
+env -u DISPLAY sh "$CUDA_RUNFILE" \
+  --silent --toolkit \
+  --toolkitpath="$HOME/Src/cuda-$CUDA_VERSION" \
+  --no-opengl-libs --no-man-page --override \
+  --tmpdir="$HOME/Src/.cuda-tmp"
+```
+
+Then point llm-launcher at it:
+
+```bash
+llm config set CUDA_HOME "$HOME/Src/cuda-13.2.2"
+./setup.sh --backend=cuda --fresh
+```
+
+`CUDA_HOME` adds `$CUDA_HOME/bin` to `PATH` and `$CUDA_HOME/lib64` to
+`LD_LIBRARY_PATH` for setup and launches. Setup also auto-detects
+`~/Src/cuda-*/bin/nvcc` if `CUDA_HOME` is not set.
+
 ## Multi-GPU
 
 List devices and their free memory:
@@ -144,6 +176,24 @@ One-off launches:
 llm launch --device CUDA0,CUDA1 --split-mode layer
 llm launch --dry-run        # verify the generated flags
 ```
+
+## Benchmarking
+
+Compare backends and devices with `llm bench` (uses `llama-bench`):
+
+```bash
+llm bench                        # Interactive device/context selection
+llm bench --quick                # Fast comparison (512,1024,2048)
+llm bench --devices CUDA0,Vulkan0,Vulkan1
+llm bench --contexts 512,1024,2048,4096
+llm bench --dry-run              # Print llama-bench commands
+```
+
+Notes:
+- Compares CUDA and Vulkan across available devices
+- Warns if comparing `CUDA0` and `Vulkan0` (same physical GPU)
+- Runs sequentially by default to avoid contention
+- Results are written to a temp directory during the run; use `--save <path>` to persist
 
 ## Server mode
 

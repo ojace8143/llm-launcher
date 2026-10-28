@@ -56,6 +56,11 @@ ${CYAN}::${NC} ${BOLD}GPU${NC}
   llm config split            Split mode
   llm config tensor-split     Tensor split (auto or manual)
 
+${CYAN}::${NC} ${BOLD}Benchmark${NC}
+  llm bench                   Benchmark across backends and devices
+  llm bench --quick           Quick comparison
+  llm bench --devices ...     Compare specific devices
+
 ${CYAN}::${NC} ${BOLD}Server${NC}
   llm serve                   Start llama-server in the foreground
   llm serve --background      Start in the background

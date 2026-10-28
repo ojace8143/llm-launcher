@@ -69,14 +69,7 @@ fi
 banner() {
     [[ -t 1 ]] && clear 2>/dev/null || true
     printf '%s%s' "$MAGENTA" "$BOLD"
-    cat <<'EOF'
-   __    __             __                        _
-  / /   / /   /\/\     / /  __ _ _   _ _ __   ___| |__   ___ _ __
- / /   / /   /    \   / /  / _` | | | | '_ \ / __| '_ \ / _ \ '__|
-/ /___/ /___/ /\/\ \ / /__| (_| | |_| | | | | (__| | | |  __/ |
-\____/\____/\/    \/ \____/\__,_|\__,_|_| |_|\___|_| |_|\___|_|
-
-EOF
+    llm_ascii_art
     printf '%s%sllm-launcher setup%s\n\n' "$NC" "$DIM" "$NC"
 }
 
@@ -230,7 +223,22 @@ detect_backends() {
     HAS_CUDA=0
     HAS_VULKAN=0
 
-    if have_cmd nvcc || [[ -x /opt/cuda/bin/nvcc ]]; then
+    # If CUDA_HOME is not configured, look in common user-local locations.
+    if [[ -z "${CUDA_HOME:-}" ]]; then
+        local cuda_dir
+        for cuda_dir in "$HOME"/Src/cuda-* /opt/cuda; do
+            if [[ -x "$cuda_dir/bin/nvcc" ]]; then
+                CUDA_HOME="$cuda_dir"
+                export CUDA_HOME
+                export PATH="$CUDA_HOME/bin:$PATH"
+                export LD_LIBRARY_PATH="$CUDA_HOME/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+                break
+            fi
+        done
+    fi
+
+    if have_cmd nvcc || [[ -n "${CUDA_HOME:-}" && -x "$CUDA_HOME/bin/nvcc" ]] ||
+        [[ -x /opt/cuda/bin/nvcc ]]; then
         HAS_CUDA=1
     fi
 
@@ -317,7 +325,7 @@ setup_llama() {
         CUDA)
             if (( ! HAS_CUDA )); then
                 [[ "$(ask_yesno "CUDA toolkit not found. Continue anyway?" No)" == "Yes" ]] ||
-                    die "CUDA toolkit missing. Install it or choose another backend."
+                    die "CUDA toolkit missing. Install it, set CUDA_HOME, or choose another backend."
             fi
             cmake_args+=("-DGGML_CUDA=ON" "-DGGML_VULKAN=OFF")
             ;;
@@ -331,7 +339,7 @@ setup_llama() {
         "CUDA + Vulkan")
             if (( ! HAS_CUDA )); then
                 [[ "$(ask_yesno "CUDA toolkit not found. Continue anyway?" No)" == "Yes" ]] ||
-                    die "CUDA toolkit missing. Install it or choose another backend."
+                    die "CUDA toolkit missing. Install it, set CUDA_HOME, or choose another backend."
             fi
             if (( ! HAS_VULKAN )); then
                 [[ "$(ask_yesno "Vulkan runtime not found. Continue anyway?" No)" == "Yes" ]] ||
@@ -347,6 +355,12 @@ setup_llama() {
             cmake_args+=("${extra[@]}")
             ;;
     esac
+
+    if [[ "$backend" == "CUDA" || "$backend" == "CUDA + Vulkan" ]] &&
+        [[ -n "${CUDA_HOME:-}" ]]; then
+        cmake_args+=("-DCUDAToolkit_ROOT=$CUDA_HOME")
+        info "Using CUDA toolkit: $CUDA_HOME"
+    fi
 
     section "Building llama.cpp"
     local build_dir="$LLAMA_DIR/build"

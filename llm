@@ -6,9 +6,9 @@ VERSION="0.3.0"
 # Resolve symlinks so `llm` works when linked into ~/.local/bin.
 SOURCE="${BASH_SOURCE[0]}"
 while [[ -L "$SOURCE" ]]; do
-    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-    SOURCE="$(readlink "$SOURCE")"
-    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 LLM_HOME="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 export LLM_HOME
@@ -17,24 +17,24 @@ export LLM_HOME
 source "$LLM_HOME/lib/common.sh"
 
 if [[ ! -f "$LLM_HOME/config/config.sh" ]]; then
-    die "Configuration not found. Run $LLM_HOME/setup.sh"
+  die "Configuration not found. Run $LLM_HOME/setup.sh"
 fi
 # shellcheck source=/dev/null
 source "$LLM_HOME/config/config.sh"
 
 if [[ -z "${LLM_HOME:-}" || -z "${MODEL_DIR:-}" || -z "${LLAMA_BIN:-}" ]]; then
-    die "Configuration is incomplete (LLM_HOME/MODEL_DIR/LLAMA_BIN empty). Run $LLM_HOME/setup.sh"
+  die "Configuration is incomplete (LLM_HOME/MODEL_DIR/LLAMA_BIN empty). Run $LLM_HOME/setup.sh"
 fi
 
 # Load every command module. Adding a command is just adding a file here.
 for cmd_file in "$LLM_HOME"/scripts/commands/*.sh; do
-    [[ -e "$cmd_file" ]] || continue
-    # shellcheck source=/dev/null
-    source "$cmd_file"
+  [[ -e "$cmd_file" ]] || continue
+  # shellcheck source=/dev/null
+  source "$cmd_file"
 done
 
 usage_short() {
-    cat <<EOF
+  cat <<EOF
 ${BOLD}llm${NC} — llama.cpp launcher
 
 ${DIM}Usage:${NC} llm <command> [subcommand] [options]
@@ -43,22 +43,22 @@ EOF
 }
 
 main() {
-    local cmd="${1:-help}"
-    [[ $# -gt 0 ]] && shift
+  local cmd="${1:-help}"
+  [[ $# -gt 0 ]] && shift
 
-    case "$cmd" in
-        -h|--help) cmd="help" ;;
-        -v|--version) cmd="version" ;;
-    esac
+  case "$cmd" in
+  -h | --help) cmd="help" ;;
+  -v | --version) cmd="version" ;;
+  esac
 
-    if declare -F "cmd_$cmd" >/dev/null 2>&1; then
-        "cmd_$cmd" "$@"
-    else
-        err "Unknown command: $cmd"
-        echo
-        usage_short
-        exit 2
-    fi
+  if declare -F "cmd_$cmd" >/dev/null 2>&1; then
+    "cmd_$cmd" "$@"
+  else
+    err "Unknown command: $cmd"
+    echo
+    usage_short
+    exit 2
+  fi
 }
 
 main "$@"

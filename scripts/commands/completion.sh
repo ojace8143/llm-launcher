@@ -14,7 +14,7 @@ completion_bash() {
     cat <<'EOF'
 _llm_complete() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="help launch config health version models devices serve agent setup completion"
+    local commands="help launch config health version models devices serve agent setup completion bench"
     if (( COMP_CWORD == 1 )); then
         COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
         return
@@ -34,6 +34,9 @@ _llm_complete() {
             ;;
         devices)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+            ;;
+        bench)
+            COMPREPLY=( $(compgen -W "--model --devices --contexts --ngl --threads --reps --warmup --delay --baseline --cooldown --quick --compare --json --csv --save --dry-run --parallel" -- "$cur") )
             ;;
     esac
 }
@@ -58,6 +61,7 @@ _llm() {
         'agent:Run the Web UI agent'
         'setup:Run setup.sh'
         'completion:Generate shell completion'
+        'bench:Benchmark across backends and devices'
     )
     if (( CURRENT == 2 )); then
         _describe 'command' commands
@@ -68,6 +72,7 @@ _llm() {
         models) _values 'models' list default info add remove download ;;
         serve) _values 'serve' status stop logs restart --background --open --agent --tools --model --host --port --workspace --mcp --sandbox --no-ui --dry-run ;;
         agent) _values 'agent' --workspace --shell --full --tools --mcp --sandbox --model --port --host --no-open --background --dry-run ;;
+        bench) _values 'bench' --model --devices --contexts --ngl --threads --reps --warmup --delay --baseline --cooldown --quick --compare --json --csv --save --dry-run --parallel ;;
     esac
 }
 _llm "$@"

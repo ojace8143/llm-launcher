@@ -17,6 +17,17 @@ fi
 : "${LLAMA_BIN:=$LLAMA_HOME/build/bin/llama-cli}"
 : "${LLAMA_SERVER_BIN:=$LLAMA_HOME/build/bin/llama-server}"
 
+# Optional custom CUDA toolkit (e.g. a runfile install under ~/Src)
+: "${CUDA_HOME:=}"
+if [[ -n "${CUDA_HOME:-}" ]]; then
+    if [[ -d "$CUDA_HOME/bin" ]]; then
+        export PATH="$CUDA_HOME/bin:$PATH"
+    fi
+    if [[ -d "$CUDA_HOME/lib64" ]]; then
+        export LD_LIBRARY_PATH="$CUDA_HOME/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    fi
+fi
+
 : "${MODEL_DIR:=$LLM_HOME/models}"
 
 : "${DEFAULT_MODEL:=}"
