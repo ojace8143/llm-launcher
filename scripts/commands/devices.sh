@@ -43,7 +43,11 @@ cmd_devices() {
     done
 
     if [[ -n "${DEVICE:-}" ]]; then
-        printf '\n  %sConfigured:%s %s\n' "$DIM" "$NC" "$DEVICE"
+        if device_is_cpu "$DEVICE"; then
+            printf '\n  %sConfigured:%s CPU only\n' "$DIM" "$NC"
+        else
+            printf '\n  %sConfigured:%s %s\n' "$DIM" "$NC" "$DEVICE"
+        fi
     else
         printf '\n  %sConfigured:%s CPU / auto\n' "$DIM" "$NC"
     fi

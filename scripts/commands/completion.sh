@@ -33,7 +33,7 @@ _llm_complete() {
             COMPREPLY=( $(compgen -W "--workspace --shell --full --tools --mcp --sandbox --model --port --host --api-key --no-open --background --dry-run" -- "$cur") )
             ;;
         models)
-            COMPREPLY=( $(compgen -W "list default info add remove download alias aliases" -- "$cur") )
+            COMPREPLY=( $(compgen -W "list default info config add remove download alias aliases" -- "$cur") )
             ;;
         devices)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
@@ -73,7 +73,7 @@ _llm() {
     fi
     case "${words[2]}" in
         config) _values 'config' show edit get set unset reset path open check default device split tensor-split main-gpu cuda context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp ;;
-        models) _values 'models' list default info add remove download alias aliases ;;
+        models) _values 'models' list default info config add remove download alias aliases ;;
         serve) _values 'serve' status stop logs restart --background --open --all --router --agent --tools --no-tools --model --alias --models-max --memory-margin --host --port --workspace --mcp --sandbox --no-ui --dry-run ;;
         opencode) _values 'opencode' config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output ;;
         agent) _values 'agent' --workspace --shell --full --tools --mcp --sandbox --model --port --host --no-open --background --dry-run ;;

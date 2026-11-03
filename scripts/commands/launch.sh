@@ -12,25 +12,25 @@ cmd_launch() {
             --dry-run) dry_run=1 ;;
             -c|--ctx|--context)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                CONTEXT_SIZE="$2"; shift ;;
+                CONTEXT_SIZE="$2"; CLI_OVERRIDES[CONTEXT_SIZE]="$2"; shift ;;
             --ngl|--gpu-layers)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                NGL="$2"; shift ;;
+                NGL="$2"; CLI_OVERRIDES[NGL]="$2"; shift ;;
             --device)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                DEVICE="$2"; shift ;;
+                DEVICE="$2"; CLI_OVERRIDES[DEVICE]="$2"; shift ;;
             --split-mode)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                SPLIT_MODE="$2"; shift ;;
+                SPLIT_MODE="$2"; CLI_OVERRIDES[SPLIT_MODE]="$2"; shift ;;
             --tensor-split)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                TENSOR_SPLIT="$2"; shift ;;
+                TENSOR_SPLIT="$2"; CLI_OVERRIDES[TENSOR_SPLIT]="$2"; shift ;;
             --main-gpu)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                MAIN_GPU="$2"; shift ;;
+                MAIN_GPU="$2"; CLI_OVERRIDES[MAIN_GPU]="$2"; shift ;;
             --temp)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                TEMP="$2"; shift ;;
+                TEMP="$2"; CLI_OVERRIDES[TEMP]="$2"; shift ;;
             --no-memory) MEMORY_ENABLED="false" ;;
             --) shift; passthrough=("$@"); break ;;
             -*) err "Unknown launch option: $1"; return 2 ;;

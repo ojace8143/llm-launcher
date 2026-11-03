@@ -51,6 +51,7 @@ ${CYAN}::${NC} ${BOLD}Models${NC}
   llm models download <url>   Download a .gguf file
   llm models alias <a> <m>    Set a readable model alias
   llm models aliases          List model aliases
+  llm models config <model>   Per-model context, GPU, and split settings
 
 ${CYAN}::${NC} ${BOLD}GPU${NC}
   llm devices                 List devices and free memory
@@ -91,6 +92,7 @@ ${CYAN}::${NC} ${BOLD}Examples${NC}
   llm launch --device CUDA0,CUDA1 --split-mode layer
   llm config set CONTEXT_SIZE 32768
   llm models alias coder coding-model.gguf
+  llm models config coder set CONTEXT_SIZE 32768
   llm serve --all --background --no-tools
   llm opencode merge
   llm agent --workspace ~/Projects/my-app

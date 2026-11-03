@@ -84,7 +84,8 @@ llm opencode merge           Merge it into an existing OpenCode config
 llm agent                    Web UI agent with read/search/edit tools
 
 llm models list              List local models
-llm models info <name>       Show size/path/profile
+llm models info <name>       Show size/path/profile/settings
+llm models config [model]    Per-model context, GPU, and split settings
 llm models add <path>        Add a .gguf to the models directory
 llm models download <url>    Download a .gguf file
 llm models alias <a> <m>     Set a readable model alias
@@ -100,6 +101,8 @@ llm launch select
 llm launch Qwen3-1.7B-Q4_K_M.gguf -- --temp 0.2
 llm config set CONTEXT_SIZE 32768
 llm models alias coder Qwen3VL-8B-Instruct-Q4_K_M.gguf
+llm models config coder set CONTEXT_SIZE 32768
+llm models config general set DEVICE CUDA0,Vulkan1
 llm serve --all --background --no-tools
 llm opencode merge
 llm health
@@ -187,6 +190,74 @@ llm launch --device CUDA0,CUDA1 --split-mode layer
 llm launch --dry-run        # verify the generated flags
 ```
 
+## Per-model configuration
+
+Global settings are the fallback. A profile overrides them for one model, and
+command-line flags override both.
+
+Create or edit a profile interactively:
+
+```bash
+llm models config                    # pick a model with fzf
+llm models config Qwen3VL-8B         # partial name works
+llm models config coder              # aliases work too
+```
+
+Scriptable commands:
+
+```bash
+llm models config <model> show       # effective values and where they come from
+llm models config <model> set CONTEXT_SIZE 32768
+llm models config <model> set DEVICE CUDA0
+llm models config <model> unset TEMP
+llm models config <model> edit       # open the profile in $EDITOR
+llm models config <model> remove
+```
+
+Profiles live in `config/profiles/<model-name-without-.gguf>.sh` and are
+gitignored. A typical pair looks like this:
+
+```bash
+# config/profiles/Qwen3VL-8B-Instruct-Q4_K_M.sh
+# Small model: everything on the 4060, 32k context.
+CONTEXT_SIZE=32768
+DEVICE="CUDA0"
+NGL=99
+```
+
+```bash
+# config/profiles/Qwen3.8-27B-UD-Q4_K_M.sh
+# Large model: 40/60 across both GPUs, 256k context.
+CONTEXT_SIZE=262144
+DEVICE="CUDA0,Vulkan1"
+SPLIT_MODE="layer"
+TENSOR_SPLIT="40,60"
+NGL=99
+```
+
+Allowed profile keys:
+
+```text
+CONTEXT_SIZE  NGL  THREADS  THREADS_BATCH  FLASH_ATTN  PARALLEL
+TEMP  TOP_P  EXTRA_ARGS  DEVICE  SPLIT_MODE  TENSOR_SPLIT  MAIN_GPU  FIT
+```
+
+Behavior worth knowing:
+
+- A single device ignores `SPLIT_MODE`, `TENSOR_SPLIT`, and `MAIN_GPU`. The
+  profile above can therefore sit on top of a global two-GPU configuration
+  without clearing the split values.
+- `DEVICE="none"` forces CPU-only for one model.
+- Router mode generates a section per model, so `llm serve --all` honors the
+  profiles. Server options such as host, port, API key, and tools remain global.
+- `llm serve <model>` and `llm launch <model>` load the profile after the global
+  configuration.
+- `llm opencode config` uses the per-model context size when generating
+  OpenCode model limits.
+
+`llm config check` validates every profile, and `llm serve --all --dry-run`
+prints the generated preset.
+
 ## Benchmarking
 
 Compare backends and devices with `llm bench` (uses `llama-bench`):
@@ -253,8 +324,10 @@ Aliases become preset section names, `--alias` values for single-model mode,
 and OpenCode model IDs. Without an alias, the GGUF filename stem is sanitized
 and used as the model ID.
 
-Router mode applies the global GPU/runtime settings to every model. Per-model
-profiles still apply when serving a single model with `llm serve <model>`.
+Router mode applies each model's profile when it loads that model, so context,
+device, split, and generation settings can differ per model. Configure them with
+`llm models config`. Server-level options such as host, port, and tools remain
+global.
 
 The first request for a model waits for it to load. Switching models can take
 several seconds while the previous model is unloaded.
@@ -368,9 +441,10 @@ Start llm-launcher with the same `SERVER_API_KEY`.
 - Use `llm serve --all --no-tools`, not `llm agent`. OpenCode supplies its own
   tools; enabling llama-server's built-in tools creates a second, competing
   tool layer.
-- `limit.context` comes from `CONTEXT_SIZE`, or from the model profile when
-  generating a single model. llama.cpp reports the model's maximum context in
-  `/v1/models`, not the configured value, so OpenCode needs this explicitly.
+- `limit.context` comes from the model profile, or from the global
+  `CONTEXT_SIZE` when the model has no profile. llama.cpp reports the model's
+  maximum context in `/v1/models`, not the configured value, so OpenCode needs
+  this explicitly.
 - Tool calling depends on the model's chat template and on `--jinja`, which is
   enabled by default in the current llama.cpp build.
 - Changing models in OpenCode may trigger a load and unload cycle. This is
@@ -405,7 +479,7 @@ MCP servers can add tools. See `config/mcp.example.json`.
 - Set values with `llm config set KEY VALUE` or edit them through
   `llm config edit`.
 - Per-model overrides live in `config/profiles/<model>.sh` (gitignored; see
-  `config/profiles/example.sh`).
+  `config/profiles/example.sh`). Manage them with `llm models config`.
 - Model aliases are stored as `MODEL_ALIASES="alias=model,..."` in the local
   config. Prefer `llm models alias <alias> <model>` over editing the string by
   hand.

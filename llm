@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.4.1"
+VERSION="0.5.0"
 
 # Resolve symlinks so `llm` works when linked into ~/.local/bin.
 SOURCE="${BASH_SOURCE[0]}"

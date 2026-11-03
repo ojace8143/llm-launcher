@@ -98,7 +98,11 @@ config_show() {
     config_row "Memory" "$memory_state"
 
     section "GPU"
-    config_row "Devices" "${DEVICE:-(CPU / auto)}"
+    local devices_state="${DEVICE:-(CPU / auto)}"
+    if device_is_cpu "$devices_state"; then
+        devices_state="CPU only"
+    fi
+    config_row "Devices" "$devices_state"
     config_row "Split mode" "${SPLIT_MODE:-layer}"
     config_row "Tensor split" "${TENSOR_SPLIT:-(auto / even)}"
     config_row "Main GPU" "${MAIN_GPU:-0}"
@@ -126,6 +130,19 @@ config_show() {
     config_row "Max output" "${OPENCODE_MAX_OUTPUT:-8192}"
     config_row "Model aliases" "${MODEL_ALIASES:-(none)}"
 
+    section "Per-model"
+    local profile_count=0 m profile
+    while IFS= read -r m; do
+        profile="$(profile_path "$m")"
+        if [[ -f "$profile" ]]; then
+            config_row "${m%.gguf}" "$profile"
+            profile_count=$((profile_count + 1))
+        fi
+    done < <(list_models)
+    if (( profile_count == 0 )); then
+        config_row "Profiles" "(none; use llm models config)"
+    fi
+
     section "Paths"
     config_row "LLM_HOME" "$LLM_HOME"
     config_row "llama.cpp" "${LLAMA_HOME:-unset}"
@@ -142,6 +159,7 @@ config_edit() {
         local option
         option="$(
             printf '%s\n' \
+                "Per-model: model settings" \
                 "Model: default model" \
                 "Model: context size" \
                 "Model: GPU layers" \
@@ -176,6 +194,7 @@ config_edit() {
         )"
 
         case "$option" in
+            "Per-model: model settings") models_config ;;
             "Model: default model") config_default ;;
             "Model: context size") config_context ;;
             "Model: GPU layers") config_ngl ;;
@@ -468,6 +487,12 @@ config_check() {
         check_fail "model aliases invalid"
     fi
 
+    if validate_all_profiles; then
+        check_ok "per-model profiles valid"
+    else
+        check_fail "one or more per-model profiles are invalid"
+    fi
+
     if [[ -n "${AGENT_WORKSPACE:-}" ]]; then
         [[ -d "$AGENT_WORKSPACE" ]] &&
             check_ok "agent workspace exists" ||
@@ -498,40 +523,9 @@ config_default() {
 }
 
 config_device() {
-    require_fzf
-    local -a rows=() choices=()
-    mapfile -t rows < <(llama_devices)
-    if (( ${#rows[@]} == 0 )); then
-        warn "No devices reported by llama.cpp (CPU-only build or no GPU)."
-        return 1
-    fi
-
-    choices+=("CPU only")
-    local row id desc free total
-    for row in "${rows[@]}"; do
-        IFS=$'\t' read -r id desc free total <<<"$row"
-        choices+=("$id|$desc")
-    done
-
-    local -a selection=()
-    mapfile -t selection < <(
-        printf '%s\n' "${choices[@]}" |
-            fzf --multi --height 40% --reverse --border --prompt="Devices (TAB to multi-select)> " || true
-    )
-    (( ${#selection[@]} > 0 )) || return 0
-
-    local -a ids=()
-    local choice
-    for choice in "${selection[@]}"; do
-        [[ "$choice" == "CPU only" ]] && { ids=(); break; }
-        ids+=("${choice%%|*}")
-    done
-
-    local joined=""
-    if (( ${#ids[@]} > 0 )); then
-        local IFS=','
-        joined="${ids[*]}"
-    fi
+    local joined
+    joined="$(select_devices)" || return 0
+    [[ "$joined" == "none" ]] && joined=""
 
     config_set DEVICE "$joined"
     if [[ -z "$joined" ]]; then
@@ -932,9 +926,18 @@ ${BOLD}OpenCode / Router${NC}
   llm config set OPENCODE_PROVIDER_ID local
   llm config set OPENCODE_MAX_OUTPUT 8192
 
+${BOLD}Per-model${NC}
+  llm models config               Pick a model and edit its settings
+  llm models config <model>       Interactive settings for one model
+  llm models config <model> show  Show effective settings
+  llm models config <model> set K V
+  llm models config <model> unset K
+  llm models config <model> edit  Open the profile in \$EDITOR
+
 ${BOLD}Keys${NC}
   $CONFIG_KEYS
 
 ${DIM}Per-model overrides: config/profiles/<model>.sh${NC}
+${DIM}Keys allowed in a profile: $PROFILE_KEYS${NC}
 EOF
 }

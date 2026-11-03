@@ -189,22 +189,22 @@ cmd_serve_run() {
                 key_override="$2"; shift ;;
             -c|--ctx|--context)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                CONTEXT_SIZE="$2"; shift ;;
+                CONTEXT_SIZE="$2"; CLI_OVERRIDES[CONTEXT_SIZE]="$2"; shift ;;
             --ngl|--gpu-layers)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                NGL="$2"; shift ;;
+                NGL="$2"; CLI_OVERRIDES[NGL]="$2"; shift ;;
             --device)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                DEVICE="$2"; shift ;;
+                DEVICE="$2"; CLI_OVERRIDES[DEVICE]="$2"; shift ;;
             --split-mode)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                SPLIT_MODE="$2"; shift ;;
+                SPLIT_MODE="$2"; CLI_OVERRIDES[SPLIT_MODE]="$2"; shift ;;
             --tensor-split)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                TENSOR_SPLIT="$2"; shift ;;
+                TENSOR_SPLIT="$2"; CLI_OVERRIDES[TENSOR_SPLIT]="$2"; shift ;;
             --parallel)
                 [[ $# -ge 2 ]] || { err "$1 requires a value"; return 2; }
-                PARALLEL="$2"; shift ;;
+                PARALLEL="$2"; CLI_OVERRIDES[PARALLEL]="$2"; shift ;;
             --no-memory) MEMORY_ENABLED="false" ;;
             -h|--help) help_serve; return 0 ;;
             -*) err "Unknown serve option: $1"; return 2 ;;
@@ -249,7 +249,7 @@ cmd_serve_run() {
 
     local resolved="" model_id="" model_desc=""
     if (( ! router )); then
-        resolved="$(resolve_model "$model_query")" || {
+        resolved="$(resolve_model_or_alias "$model_query")" || {
             err "Model not found: $model_query"
             return 1
         }
@@ -259,6 +259,7 @@ cmd_serve_run() {
             return 1
         }
         load_profile "$resolved"
+        apply_cli_overrides
         validate_gpu_config || return 1
 
         model_id="${alias_override:-$(alias_for_model "$resolved")}"
@@ -330,7 +331,8 @@ cmd_serve_run() {
 
     local -a args=()
     if (( router )); then
-        build_runtime_args args
+        # Runtime settings belong in the generated preset. Passing them on the
+        # router command line would override every per-model profile.
         args+=(--host "${SERVER_HOST:-127.0.0.1}" --port "${SERVER_PORT:-9931}")
         [[ -n "${SERVER_API_KEY:-}" ]] && args+=(--api-key "$SERVER_API_KEY")
         if [[ "${SERVER_AGENT:-false}" == "true" ]]; then
@@ -606,9 +608,10 @@ ${BOLD}Options${NC}
       --parallel N              Server slots
       --no-memory               Disable long-term memory
 
-${DIM}Router mode uses the global GPU/runtime settings for every model. Configure
-aliases with 'llm models alias' and generate an OpenCode provider with
-'llm opencode config'.${NC}
+${DIM}Router mode reads per-model context and GPU settings from
+config/profiles/<model>.sh. Edit them with 'llm models config'. Server options
+such as host, port, and tools remain global. Configure aliases with
+'llm models alias' and generate an OpenCode provider with 'llm opencode config'.${NC}
 
 ${DIM}The server binds to loopback. Set SERVER_API_KEY before exposing it.${NC}
 EOF

@@ -129,6 +129,12 @@ cmd_health() {
         check_ok "no model aliases configured"
     fi
 
+    if validate_all_profiles; then
+        check_ok "per-model profiles valid"
+    else
+        check_fail "one or more per-model profiles are invalid"
+    fi
+
     if [[ -f "${RUN_DIR:-$LLM_HOME/run}/server.pid" ]]; then
         check_ok "background server PID file present"
     fi
@@ -152,7 +158,8 @@ help_health() {
 ${BOLD}llm health${NC}
 
 Check the configuration, llama.cpp binaries, models, model aliases,
-devices, multi-GPU split settings, memory file, server paths, and fzf.
+per-model profiles, devices, multi-GPU split settings, memory file, server
+paths, and fzf.
 
   llm health        Run checks (exit 1 if any fail)
   llm config check  Configuration-only checks
