@@ -14,6 +14,8 @@ Note: original project was created a few months ago, and llama.cpp has progresse
 - Linux with a bash shell
 - `git`, `cmake`, `make`, a C++ compiler (`g++` or `clang++`), `curl`, `fzf`
 - Optional: CUDA toolkit (`nvcc`) and/or a Vulkan runtime for GPU builds
+- Optional: OpenCode for the local OpenAI-compatible provider setup
+- Optional: `python3` if you use `llm opencode merge`
 
 `setup.sh` can install the basic dependencies on xbps, pacman, emerge, and
 apt-based systems. (More support should come later)
@@ -76,12 +78,17 @@ llm version                  Show version and paths
 
 llm devices                  List GPUs and free VRAM
 llm serve                    Run llama-server (OpenAI-compatible API + UI)
+llm serve --all              Serve every installed model (router mode)
+llm opencode config          Print an OpenCode provider snippet
+llm opencode merge           Merge it into an existing OpenCode config
 llm agent                    Web UI agent with read/search/edit tools
 
 llm models list              List local models
 llm models info <name>       Show size/path/profile
 llm models add <path>        Add a .gguf to the models directory
 llm models download <url>    Download a .gguf file
+llm models alias <a> <m>     Set a readable model alias
+llm models aliases           List model aliases
 llm completion bash|zsh      Print shell completion
 llm setup                    Run the setup script
 ```
@@ -92,6 +99,9 @@ Examples:
 llm launch select
 llm launch Qwen3-1.7B-Q4_K_M.gguf -- --temp 0.2
 llm config set CONTEXT_SIZE 32768
+llm models alias coder Qwen3VL-8B-Instruct-Q4_K_M.gguf
+llm serve --all --background --no-tools
+llm opencode merge
 llm health
 ```
 
@@ -200,11 +210,13 @@ Notes:
 `llm serve` starts `llama-server` with the same model and GPU settings:
 
 ```bash
-llm serve                      # foreground
+llm serve                      # foreground, default model
+llm serve <model>              # foreground, one model
 llm serve --background         # background
 llm serve status
 llm serve logs -f
 llm serve stop
+llm serve restart
 ```
 
 The server listens on `127.0.0.1:9931` by default and exposes an
@@ -212,10 +224,157 @@ OpenAI-compatible API at `/v1`, plus the llama.cpp Web UI.
 
 ```bash
 curl http://127.0.0.1:9931/v1/models
+curl http://127.0.0.1:9931/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"local","messages":[{"role":"user","content":"hello"}],"stream":true}'
 ```
 
-This endpoint can be used by other agent harnesses (for example OpenCode) as a
-local OpenAI-compatible provider.
+### Multiple models
+
+`llama-server` supports a router mode that loads models on demand and unloads
+them when they are no longer needed. llm-launcher exposes this with:
+
+```bash
+llm serve --all --background
+```
+
+Router mode uses a generated preset in `run/models.ini`. Every installed model
+is listed through `/v1/models` and can be requested by name. With
+`SERVER_MODELS_MAX=1` (the default), only one model is loaded at a time, which
+is the sensible choice for an 8 GB GPU.
+
+```bash
+llm models alias coder Qwen3VL-8B-Instruct-Q4_K_M.gguf
+llm models alias general Qwen3.8-27B-UD-Q4_K_M.gguf
+llm serve --all --background --no-tools
+```
+
+Aliases become preset section names, `--alias` values for single-model mode,
+and OpenCode model IDs. Without an alias, the GGUF filename stem is sanitized
+and used as the model ID.
+
+Router mode applies the global GPU/runtime settings to every model. Per-model
+profiles still apply when serving a single model with `llm serve <model>`.
+
+The first request for a model waits for it to load. Switching models can take
+several seconds while the previous model is unloaded.
+
+## OpenCode integration
+
+OpenCode can use the local server through its OpenAI-compatible provider
+package. The recommended setup is router mode plus explicit aliases:
+
+```bash
+llm models alias coder Qwen3VL-8B-Instruct-Q4_K_M.gguf
+llm models alias general Qwen3.8-27B-UD-Q4_K_M.gguf
+llm serve --all --background --no-tools
+llm opencode merge
+```
+
+`llm opencode config` prints a valid OpenCode V2 configuration snippet. It does
+not modify your OpenCode config unless you ask it to:
+
+```bash
+llm opencode merge                   # merge into the existing global config
+llm opencode config --merge --yes    # non-interactive
+llm opencode config --merge --dry-run
+llm opencode config --write          # write only if no global config exists
+llm opencode config --output FILE    # write or merge at FILE
+llm opencode config --model NAME     # one model instead of all
+```
+
+`llm opencode merge` merges the generated provider into an existing
+`~/.config/opencode/opencode.json` or `opencode.jsonc`:
+
+- unrelated top-level settings are preserved
+- unrelated providers and models are preserved
+- matching generated model entries are updated
+- `settings.baseURL`, `name`, `package`, and `env` are updated when generated
+- a timestamped backup is created before writing
+- the write is atomic and keeps the original file permissions
+- JSONC comments are not preserved in the rewritten file; the backup keeps the
+  original
+
+The merge prompts before writing. Use `--yes` for scripts. Use
+`--dry-run` to print the merged config without changing anything.
+
+`--write` still refuses to overwrite an existing config and prints the snippet
+for manual merging instead.
+
+Merging requires `python3`; the rest of llm-launcher does not.
+
+The generated provider looks like this:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "providers": {
+    "local": {
+      "name": "llama.cpp (local)",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://127.0.0.1:9931/v1"
+      },
+      "models": {
+        "general": {
+          "name": "general (Qwen3.8-27B-UD-Q4_K_M)",
+          "modelID": "general",
+          "limit": { "context": 64000, "output": 8192 },
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "coder": {
+          "name": "coder (Qwen3VL-8B-Instruct-Q4_K_M)",
+          "modelID": "coder",
+          "limit": { "context": 64000, "output": 8192 },
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+OpenCode does not auto-discover custom OpenAI-compatible providers, so each
+model is listed explicitly. The server still exposes `/v1/models` for clients
+that do use discovery.
+
+### API key
+
+If `SERVER_API_KEY` is set, the generated provider uses
+`LLM_LOCAL_API_KEY`:
+
+```jsonc
+"env": ["LLM_LOCAL_API_KEY"]
+```
+
+Export the key in the environment that launches OpenCode:
+
+```bash
+export LLM_LOCAL_API_KEY='your-key'
+```
+
+Start llm-launcher with the same `SERVER_API_KEY`.
+
+### OpenCode notes
+
+- Use `llm serve --all --no-tools`, not `llm agent`. OpenCode supplies its own
+  tools; enabling llama-server's built-in tools creates a second, competing
+  tool layer.
+- `limit.context` comes from `CONTEXT_SIZE`, or from the model profile when
+  generating a single model. llama.cpp reports the model's maximum context in
+  `/v1/models`, not the configured value, so OpenCode needs this explicitly.
+- Tool calling depends on the model's chat template and on `--jinja`, which is
+  enabled by default in the current llama.cpp build.
+- Changing models in OpenCode may trigger a load and unload cycle. This is
+  normal in router mode.
 
 ## Agent mode
 
@@ -247,6 +406,9 @@ MCP servers can add tools. See `config/mcp.example.json`.
   `llm config edit`.
 - Per-model overrides live in `config/profiles/<model>.sh` (gitignored; see
   `config/profiles/example.sh`).
+- Model aliases are stored as `MODEL_ALIASES="alias=model,..."` in the local
+  config. Prefer `llm models alias <alias> <model>` over editing the string by
+  hand.
 
 Useful keys:
 
@@ -257,6 +419,8 @@ CONTEXT_SIZE   NGL             THREADS          FLASH_ATTN
 DEVICE         SPLIT_MODE      TENSOR_SPLIT     MAIN_GPU
 SERVER_HOST    SERVER_PORT     SERVER_API_KEY
 SERVER_TOOLS   AGENT_WORKSPACE MCP_CONFIG
+SERVER_MODELS_MAX  SERVER_MEMORY_MARGIN  SERVER_START_TIMEOUT
+MODEL_ALIASES  OPENCODE_PROVIDER_ID  OPENCODE_MAX_OUTPUT
 ```
 
 Environment overrides are available for temporary changes:
@@ -285,7 +449,14 @@ settings, memory file, server/agent paths, and fzf. Also run:
 ```bash
 llm config check
 llm devices
+llm serve status
+llm serve logs
 ```
+
+If a port is already occupied, `llm serve` refuses to start rather than
+attaching to an unrelated process. Stale PID files are detected and removed
+automatically. Use `llm serve --port <port>` to run another instance on a
+different port.
 
 Re-run `./setup.sh` if a path or build is missing.
 

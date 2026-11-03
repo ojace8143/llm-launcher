@@ -23,7 +23,7 @@ LLM_HOME="${LLM_HOME:-$(cd "$_COMMON_DIR/.." && pwd)}"
 export LLM_HOME
 
 LLM_CONFIG="${LLM_CONFIG:-$LLM_HOME/config/config.local.sh}"
-VERSION="${VERSION:-0.3.0}"
+VERSION="${VERSION:-0.4.1}"
 
 PROFILE_TOOLS="read_file,file_glob_search,grep_search,get_info,write_file,edit_file"
 ALL_TOOLS="read_file,file_glob_search,grep_search,get_info,write_file,edit_file,exec_shell_command"
@@ -228,6 +228,221 @@ load_profile() {
     fi
 }
 
+# Resolve a model name to an absolute path. Prints the input unchanged when it
+# cannot be resolved, so callers can still validate the result themselves.
+absolute_model_path() {
+    local model="$1"
+    if [[ "$model" != /* ]]; then
+        model="${MODEL_DIR:-}/$model"
+    fi
+    local dir
+    if ! dir="$(cd "$(dirname "$model")" 2>/dev/null && pwd)"; then
+        printf '%s\n' "$model"
+        return 1
+    fi
+    printf '%s/%s\n' "$dir" "$(basename "$model")"
+}
+
+# ---------------------------------------------------------------------------
+# Model aliases
+#
+# MODEL_ALIASES is a comma-separated list of alias=model pairs, for example:
+#   MODEL_ALIASES="coder=coding-model.gguf,general=general-model.gguf"
+#
+# Aliases are used as llama-server --alias values, router preset section names,
+# and OpenCode model IDs.
+# ---------------------------------------------------------------------------
+
+_alias_valid() {
+    [[ "${1:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+}
+
+# Print alias<TAB>model for every valid entry in MODEL_ALIASES.
+model_alias_entries() {
+    local raw="${MODEL_ALIASES:-}"
+    [[ -n "$raw" ]] || return 0
+
+    local item alias model
+    local -a items=()
+    IFS=',' read -r -a items <<<"$raw"
+    for item in "${items[@]}"; do
+        item="${item#"${item%%[![:space:]]*}"}"
+        item="${item%"${item##*[![:space:]]}"}"
+        [[ -n "$item" && "$item" == *=* ]] || continue
+        alias="${item%%=*}"
+        model="${item#*=}"
+        alias="${alias#"${alias%%[![:space:]]*}"}"
+        alias="${alias%"${alias##*[![:space:]]}"}"
+        model="${model#"${model%%[![:space:]]*}"}"
+        model="${model%"${model##*[![:space:]]}"}"
+        [[ -n "$alias" && -n "$model" ]] || continue
+        printf '%s\t%s\n' "$alias" "$model"
+    done
+}
+
+# Expand an alias target to a path without requiring the file to exist.
+alias_model_path() {
+    local model="$1"
+    if [[ "$model" == /* || "$model" == */* ]]; then
+        printf '%s\n' "$model"
+    else
+        printf '%s/%s\n' "${MODEL_DIR:-}" "$model"
+    fi
+}
+
+# Turn a filename stem into a safe model ID.
+sanitize_model_id() {
+    local id="${1:-}"
+    id="${id//[^A-Za-z0-9._-]/-}"
+    id="$(printf '%s' "$id" | sed -E 's/^-+//; s/-+$//')"
+    [[ -n "$id" ]] || id="model"
+    printf '%s\n' "$id"
+}
+
+# Print the configured alias for a model, or its sanitized filename stem.
+alias_for_model() {
+    local model="$1"
+    local base model_path alias target
+    base="${model##*/}"
+    base="${base%.gguf}"
+    model_path="$(absolute_model_path "$model" 2>/dev/null)" || model_path="$model"
+
+    while IFS=$'\t' read -r alias target; do
+        local target_path
+        target_path="$(alias_model_path "$target")"
+        if [[ "$target" == "$base" ||
+            "$target" == "$model" ||
+            "$target" == "${model##*/}" ||
+            "$target_path" == "$model" ||
+            "$target_path" == "$model_path" ]]; then
+            printf '%s\n' "$alias"
+            return 0
+        fi
+    done < <(model_alias_entries)
+
+    sanitize_model_id "$base"
+}
+
+# Print the model configured for an alias.
+model_for_alias() {
+    local wanted="$1" alias target
+    while IFS=$'\t' read -r alias target; do
+        if [[ "$alias" == "$wanted" ]]; then
+            printf '%s\n' "$target"
+            return 0
+        fi
+    done < <(model_alias_entries)
+    return 1
+}
+
+# Validate MODEL_ALIASES, or the value passed as the first argument.
+validate_aliases() {
+    local raw="${1:-${MODEL_ALIASES:-}}"
+    local failures=0
+    local -A seen=()
+
+    if [[ -z "$raw" ]]; then
+        return 0
+    fi
+
+    local item alias target path
+    local -a items=()
+    IFS=',' read -r -a items <<<"$raw"
+    for item in "${items[@]}"; do
+        item="${item#"${item%%[![:space:]]*}"}"
+        item="${item%"${item##*[![:space:]]}"}"
+        [[ -n "$item" ]] || continue
+        if [[ "$item" != *=* ]]; then
+            err "Invalid MODEL_ALIASES entry (expected alias=model): $item"
+            failures=$((failures + 1))
+            continue
+        fi
+        alias="${item%%=*}"
+        target="${item#*=}"
+        alias="${alias#"${alias%%[![:space:]]*}"}"
+        alias="${alias%"${alias##*[![:space:]]}"}"
+        target="${target#"${target%%[![:space:]]*}"}"
+        target="${target%"${target##*[![:space:]]}"}"
+
+        if ! _alias_valid "$alias"; then
+            err "Invalid model alias '$alias' (use letters, numbers, dot, underscore, or dash)"
+            failures=$((failures + 1))
+        elif [[ -n "${seen[$alias]:-}" ]]; then
+            err "Duplicate model alias: $alias"
+            failures=$((failures + 1))
+        else
+            seen[$alias]=1
+        fi
+
+        path="$(alias_model_path "$target")"
+        if [[ -z "$target" || ! -f "$path" ]]; then
+            err "Alias '$alias' points to a missing model: ${path:-$target}"
+            failures=$((failures + 1))
+        fi
+    done
+
+    (( failures == 0 ))
+}
+
+# Read the context size for a model, honoring its profile.
+context_for_model() {
+    local model="$1"
+    (
+        load_profile "$model"
+        printf '%s' "${CONTEXT_SIZE:-}"
+    )
+}
+
+# Build a router preset exposing every installed model. Alias entries become
+# preset section names; unaliased models use their sanitized filename.
+write_router_preset() {
+    local path="$1"
+    local -a models=()
+    mapfile -t models < <(list_models)
+    if (( ${#models[@]} == 0 )); then
+        err "No .gguf models found in ${MODEL_DIR:-models}"
+        return 1
+    fi
+
+    local model_dir="$MODEL_DIR"
+    if [[ "$model_dir" != /* ]]; then
+        model_dir="$(cd "$model_dir" 2>/dev/null && pwd)" || {
+            err "Unable to resolve model directory: $MODEL_DIR"
+            return 1
+        }
+    fi
+
+    local tmp
+    tmp="$(mktemp "${path}.XXXXXX")" || {
+        err "Unable to create temporary file for $path"
+        return 1
+    }
+
+    local -A seen=()
+    local base resolved id
+    {
+        printf '# Generated by llm-launcher. Do not edit.\n'
+        printf 'version = 1\n\n'
+        for base in "${models[@]}"; do
+            resolved="$model_dir/$base"
+            id="$(alias_for_model "$resolved")"
+            if [[ -n "${seen[$id]:-}" ]]; then
+                err "Duplicate model ID '$id' for $base and ${seen[$id]}"
+                rm -f "$tmp"
+                return 1
+            fi
+            seen[$id]="$base"
+            printf '[%s]\n' "$id"
+            printf 'model = %s\n\n' "$resolved"
+        done
+    } >"$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+
+    mv -- "$tmp" "$path"
+}
+
 # ---------------------------------------------------------------------------
 # Device helpers
 # ---------------------------------------------------------------------------
@@ -361,13 +576,14 @@ validate_gpu_config() {
 # Argument builders
 # ---------------------------------------------------------------------------
 
-# build_llama_args <out-array-name> <model-path>
-build_llama_args() {
+# build_runtime_args <out-array-name>
+# Model/runtime options shared by llama-cli, single-model llama-server, and
+# router-mode llama-server (where they are inherited by model instances).
+build_runtime_args() {
     local out_var="$1"
-    local model="$2"
     local -n out="$out_var"
 
-    out=(-m "$model")
+    out=()
 
     [[ -n "${NGL:-}" ]] && out+=(-ngl "$NGL")
     [[ -n "${CONTEXT_SIZE:-}" ]] && out+=(-c "$CONTEXT_SIZE")
@@ -399,6 +615,17 @@ build_llama_args() {
         out+=("${extra[@]}")
     fi
     return 0
+}
+
+# build_llama_args <out-array-name> <model-path>
+build_llama_args() {
+    local out_var="$1"
+    local model="$2"
+    local -n out="$out_var"
+
+    local -a runtime=()
+    build_runtime_args runtime
+    out=(-m "$model" "${runtime[@]}")
 }
 
 # build_server_args <out-array-name> <model-path>

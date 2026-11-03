@@ -49,6 +49,8 @@ ${CYAN}::${NC} ${BOLD}Models${NC}
   llm models                  List local models
   llm models add <path>       Add a .gguf to the models directory
   llm models download <url>   Download a .gguf file
+  llm models alias <a> <m>    Set a readable model alias
+  llm models aliases          List model aliases
 
 ${CYAN}::${NC} ${BOLD}GPU${NC}
   llm devices                 List devices and free memory
@@ -63,8 +65,16 @@ ${CYAN}::${NC} ${BOLD}Benchmark${NC}
 
 ${CYAN}::${NC} ${BOLD}Server${NC}
   llm serve                   Start llama-server in the foreground
+  llm serve <model>           Serve one model
+  llm serve --all             Expose every installed model (router mode)
   llm serve --background      Start in the background
   llm serve status|stop|logs  Manage the background server
+
+${CYAN}::${NC} ${BOLD}OpenCode${NC}
+  llm opencode config         Print an OpenCode provider snippet
+  llm opencode config --write Write a new global OpenCode config
+  llm opencode config --merge Merge into an existing OpenCode config
+  llm opencode merge          Alias for config --merge
 
 ${CYAN}::${NC} ${BOLD}Agent${NC}
   llm agent                   Web UI agent with read/search/edit tools
@@ -80,7 +90,9 @@ ${CYAN}::${NC} ${BOLD}Examples${NC}
   llm launch Qwen3-1.7B-Q4_K_M.gguf -- --temp 0.2
   llm launch --device CUDA0,CUDA1 --split-mode layer
   llm config set CONTEXT_SIZE 32768
-  llm serve --background
+  llm models alias coder coding-model.gguf
+  llm serve --all --background --no-tools
+  llm opencode merge
   llm agent --workspace ~/Projects/my-app
   llm health
 

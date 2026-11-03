@@ -13,6 +13,8 @@ cmd_models() {
         add) models_add "$@" ;;
         remove|rm) models_remove "$@" ;;
         info) models_info "$@" ;;
+        alias) models_alias "$@" ;;
+        aliases) models_aliases ;;
         *)
             err "Unknown models option: $sub"
             help_models
@@ -104,6 +106,28 @@ models_remove() {
 
     rm -f "$resolved" || die "Unable to remove $resolved"
     info "Removed: $resolved"
+
+    local -a pairs=()
+    local -a removed_aliases=()
+    local alias target target_path pair joined=""
+    while IFS=$'\t' read -r alias target; do
+        target_path="$(alias_model_path "$target")"
+        if [[ "$target_path" == "$resolved" ||
+            "$target" == "${resolved##*/}" ]]; then
+            removed_aliases+=("$alias")
+        else
+            pairs+=("$alias=$target")
+        fi
+    done < <(model_alias_entries)
+
+    if (( ${#removed_aliases[@]} > 0 )); then
+        for pair in "${pairs[@]}"; do
+            [[ -n "$joined" ]] && joined="$joined,$pair" || joined="$pair"
+        done
+        config_set MODEL_ALIASES "$joined"
+        info "Removed alias(es): ${removed_aliases[*]}"
+    fi
+
     if [[ "$(basename "$resolved")" == "${DEFAULT_MODEL:-}" ]]; then
         config_set DEFAULT_MODEL ""
         info "Default model cleared"
@@ -126,9 +150,105 @@ models_info() {
     printf '  %-18s %s\n' "Path" "$resolved"
     printf '  %-18s %s\n' "Size" "$size"
     printf '  %-18s %s\n' "Default" "$([[ "${resolved##*/}" == "${DEFAULT_MODEL:-}" ]] && echo yes || echo no)"
+    printf '  %-18s %s\n' "API alias" "$(alias_for_model "$resolved")"
     local profile
     profile="$(profile_path "$resolved")"
     printf '  %-18s %s\n' "Profile" "$([[ -f "$profile" ]] && echo "$profile" || echo "(none)")"
+}
+
+models_alias() {
+    local remove=0 alias="" model=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --remove|-r) remove=1 ;;
+            -h|--help) help_models; return 0 ;;
+            *)
+                if [[ -z "$alias" ]]; then
+                    alias="$1"
+                elif [[ -z "$model" ]]; then
+                    model="$1"
+                else
+                    err "Unexpected argument: $1"
+                    return 2
+                fi
+                ;;
+        esac
+        shift
+    done
+
+    [[ -n "$alias" ]] || {
+        err "Usage: llm models alias <alias> <model>"
+        err "       llm models alias --remove <alias>"
+        return 2
+    }
+    _alias_valid "$alias" || {
+        err "Invalid alias '$alias' (use letters, numbers, dot, underscore, or dash)"
+        return 2
+    }
+
+    local -a pairs=()
+    local pair existing_alias existing_model
+    while IFS=$'\t' read -r existing_alias existing_model; do
+        [[ "$existing_alias" == "$alias" ]] && continue
+        pairs+=("$existing_alias=$existing_model")
+    done < <(model_alias_entries)
+
+    if (( remove )); then
+        [[ -z "$model" ]] || { err "Usage: llm models alias --remove <alias>"; return 2; }
+        if ! model_for_alias "$alias" >/dev/null; then
+            warn "Alias not configured: $alias"
+        fi
+    else
+        [[ -n "$model" ]] || {
+            err "Usage: llm models alias <alias> <model>"
+            return 2
+        }
+        local resolved
+        resolved="$(resolve_model "$model")" || {
+            err "Model not found: $model"
+            return 1
+        }
+        [[ -n "$resolved" ]] || return 1
+        resolved="$(absolute_model_path "$resolved")" || {
+            err "Unable to resolve model path: $resolved"
+            return 1
+        }
+        pairs+=("$alias=${resolved##*/}")
+    fi
+
+    local joined=""
+    for pair in "${pairs[@]}"; do
+        [[ -n "$joined" ]] && joined="$joined,$pair" || joined="$pair"
+    done
+    config_set MODEL_ALIASES "$joined"
+
+    if (( remove )); then
+        info "Removed alias: $alias"
+    else
+        info "Alias set: $alias -> ${pairs[${#pairs[@]}-1]#*=}"
+    fi
+}
+
+models_aliases() {
+    section "Model aliases"
+    local count=0
+    local alias model path state
+    while IFS=$'\t' read -r alias model; do
+        (( count == 0 )) && printf '  %-18s %-44s %s\n' "Alias" "Model" "Status"
+        path="$(alias_model_path "$model")"
+        if [[ -f "$path" ]]; then
+            state="${GREEN}ok${NC}"
+        else
+            state="${RED}missing${NC}"
+        fi
+        printf '  %-18s %-44s %s\n' "$alias" "$model" "$state"
+        count=$((count + 1))
+    done < <(model_alias_entries)
+
+    if (( count == 0 )); then
+        info "No aliases configured."
+        info "Add one with: llm models alias <alias> <model>"
+    fi
 }
 
 help_models() {
@@ -141,7 +261,11 @@ ${BOLD}llm models${NC} <subcommand>
   llm models add <path> [--link]   Add a .gguf (copy, or symlink with --link)
   llm models remove <name>         Delete a model
   llm models download <url>        Download a .gguf file
+  llm models alias <alias> <model> Set a readable API/OpenCode model alias
+  llm models alias --remove <alias> Remove an alias
+  llm models aliases               List configured aliases
 
 ${DIM}Models directory: ${MODEL_DIR:-unset}${NC}
+${DIM}Aliases are used by llama-server and 'llm opencode config'.${NC}
 EOF
 }

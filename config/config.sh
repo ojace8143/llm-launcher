@@ -63,6 +63,14 @@ fi
 : "${SERVER_AGENT:=false}"
 : "${AGENT_WORKSPACE:=}"
 : "${MCP_CONFIG:=}"
+: "${SERVER_MODELS_MAX:=1}"
+: "${SERVER_MEMORY_MARGIN:=0}"
+: "${SERVER_START_TIMEOUT:=180}"
+
+# OpenCode integration
+: "${MODEL_ALIASES:=}"
+: "${OPENCODE_PROVIDER_ID:=local}"
+: "${OPENCODE_MAX_OUTPUT:=8192}"
 
 : "${RUN_DIR:=$LLM_HOME/run}"
 : "${LOG_DIR:=$LLM_HOME/logs}"

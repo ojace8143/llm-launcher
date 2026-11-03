@@ -14,7 +14,7 @@ completion_bash() {
     cat <<'EOF'
 _llm_complete() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="help launch config health version models devices serve agent setup completion bench"
+    local commands="help launch config health version models devices serve opencode agent setup completion bench"
     if (( COMP_CWORD == 1 )); then
         COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
         return
@@ -24,13 +24,16 @@ _llm_complete() {
             COMPREPLY=( $(compgen -W "show edit get set unset reset path open check default device split tensor-split main-gpu cuda context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp" -- "$cur") )
             ;;
         serve)
-            COMPREPLY=( $(compgen -W "status stop logs restart --background --open --no-open --agent --tools --mcp --sandbox --model --host --port --api-key --workspace --no-ui --dry-run --device --split-mode --tensor-split --parallel --ctx --ngl" -- "$cur") )
+            COMPREPLY=( $(compgen -W "status stop logs restart --background --open --no-open --all --router --agent --tools --no-tools --mcp --sandbox --model --alias --models-max --memory-margin --host --port --api-key --workspace --no-ui --dry-run --device --split-mode --tensor-split --parallel --ctx --ngl" -- "$cur") )
+            ;;
+        opencode)
+            COMPREPLY=( $(compgen -W "config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output" -- "$cur") )
             ;;
         agent)
             COMPREPLY=( $(compgen -W "--workspace --shell --full --tools --mcp --sandbox --model --port --host --api-key --no-open --background --dry-run" -- "$cur") )
             ;;
         models)
-            COMPREPLY=( $(compgen -W "list default info add remove download" -- "$cur") )
+            COMPREPLY=( $(compgen -W "list default info add remove download alias aliases" -- "$cur") )
             ;;
         devices)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
@@ -58,6 +61,7 @@ _llm() {
         'models:Manage models'
         'devices:List devices'
         'serve:Run llama-server'
+        'opencode:Generate OpenCode provider configuration'
         'agent:Run the Web UI agent'
         'setup:Run setup.sh'
         'completion:Generate shell completion'
@@ -69,8 +73,9 @@ _llm() {
     fi
     case "${words[2]}" in
         config) _values 'config' show edit get set unset reset path open check default device split tensor-split main-gpu cuda context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp ;;
-        models) _values 'models' list default info add remove download ;;
-        serve) _values 'serve' status stop logs restart --background --open --agent --tools --model --host --port --workspace --mcp --sandbox --no-ui --dry-run ;;
+        models) _values 'models' list default info add remove download alias aliases ;;
+        serve) _values 'serve' status stop logs restart --background --open --all --router --agent --tools --no-tools --model --alias --models-max --memory-margin --host --port --workspace --mcp --sandbox --no-ui --dry-run ;;
+        opencode) _values 'opencode' config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output ;;
         agent) _values 'agent' --workspace --shell --full --tools --mcp --sandbox --model --port --host --no-open --background --dry-run ;;
         bench) _values 'bench' --model --devices --contexts --ngl --threads --reps --warmup --delay --baseline --cooldown --quick --compare --json --csv --save --dry-run --parallel ;;
     esac

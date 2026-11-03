@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # `llm config` — view and change configuration.
 
-CONFIG_KEYS="DEFAULT_MODEL MODEL_DIR LLAMA_HOME LLAMA_BIN LLAMA_SERVER_BIN CUDA_HOME MEMORY_DIR MEMORY_FILE MEMORY_ENABLED CONTEXT_SIZE NGL THREADS THREADS_BATCH FLASH_ATTN PARALLEL TEMP TOP_P EXTRA_ARGS DEVICE SPLIT_MODE TENSOR_SPLIT MAIN_GPU FIT SERVER_HOST SERVER_PORT SERVER_API_KEY SERVER_TOOLS SERVER_AGENT AGENT_WORKSPACE MCP_CONFIG RUN_DIR LOG_DIR"
+CONFIG_KEYS="DEFAULT_MODEL MODEL_DIR LLAMA_HOME LLAMA_BIN LLAMA_SERVER_BIN CUDA_HOME MEMORY_DIR MEMORY_FILE MEMORY_ENABLED CONTEXT_SIZE NGL THREADS THREADS_BATCH FLASH_ATTN PARALLEL TEMP TOP_P EXTRA_ARGS DEVICE SPLIT_MODE TENSOR_SPLIT MAIN_GPU FIT SERVER_HOST SERVER_PORT SERVER_API_KEY SERVER_TOOLS SERVER_AGENT AGENT_WORKSPACE MCP_CONFIG SERVER_MODELS_MAX SERVER_MEMORY_MARGIN SERVER_START_TIMEOUT MODEL_ALIASES OPENCODE_PROVIDER_ID OPENCODE_MAX_OUTPUT RUN_DIR LOG_DIR"
 
 cmd_config() {
     local sub="${1:-}"
@@ -117,6 +117,14 @@ config_show() {
     config_row "Tools" "${SERVER_TOOLS:-(none)}"
     config_row "Workspace" "${AGENT_WORKSPACE:-(current dir)}"
     config_row "MCP config" "${MCP_CONFIG:-(none)}"
+    config_row "Router max models" "${SERVER_MODELS_MAX:-1}"
+    config_row "Router memory margin" "${SERVER_MEMORY_MARGIN:-0} MiB"
+    config_row "Start timeout" "${SERVER_START_TIMEOUT:-180}s"
+
+    section "OpenCode"
+    config_row "Provider ID" "${OPENCODE_PROVIDER_ID:-local}"
+    config_row "Max output" "${OPENCODE_MAX_OUTPUT:-8192}"
+    config_row "Model aliases" "${MODEL_ALIASES:-(none)}"
 
     section "Paths"
     config_row "LLM_HOME" "$LLM_HOME"
@@ -153,9 +161,14 @@ config_edit() {
                 "Server: host" \
                 "Server: port" \
                 "Server: API key" \
+                "Server: router max models" \
+                "Server: start timeout" \
                 "Agent: tools" \
                 "Agent: workspace" \
                 "Agent: MCP config" \
+                "OpenCode: provider ID" \
+                "OpenCode: max output tokens" \
+                "OpenCode: model aliases" \
                 "Maintenance: show config" \
                 "Maintenance: check config" \
                 "Exit" |
@@ -182,9 +195,14 @@ config_edit() {
             "Server: host") config_server_host ;;
             "Server: port") config_server_port ;;
             "Server: API key") config_api_key ;;
+            "Server: router max models") config_router_max ;;
+            "Server: start timeout") config_start_timeout ;;
             "Agent: tools") config_tools ;;
             "Agent: workspace") config_workspace ;;
             "Agent: MCP config") config_mcp ;;
+            "OpenCode: provider ID") config_opencode_provider ;;
+            "OpenCode: max output tokens") config_opencode_max_output ;;
+            "OpenCode: model aliases") config_model_aliases ;;
             "Maintenance: show config") config_show ;;
             "Maintenance: check config") config_check || true ;;
             ""|"Exit") return 0 ;;
@@ -212,6 +230,25 @@ _validate_set() {
                 err "SERVER_PORT must be between 1 and 65535"
                 return 2
             }
+            ;;
+        SERVER_MODELS_MAX|SERVER_MEMORY_MARGIN)
+            _require_number "$key" "$value" || return 2
+            ;;
+        SERVER_START_TIMEOUT|OPENCODE_MAX_OUTPUT)
+            _require_number "$key" "$value" || return 2
+            (( value > 0 )) || {
+                err "$key must be greater than zero"
+                return 2
+            }
+            ;;
+        OPENCODE_PROVIDER_ID)
+            [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
+                err "OPENCODE_PROVIDER_ID must use letters, numbers, dot, underscore, or dash"
+                return 2
+            }
+            ;;
+        MODEL_ALIASES)
+            validate_aliases "$value" || return 2
             ;;
         SPLIT_MODE)
             case "$value" in
@@ -410,6 +447,25 @@ config_check() {
 
     if [[ -n "${MCP_CONFIG:-}" ]]; then
         [[ -f "$MCP_CONFIG" ]] && check_ok "MCP config exists" || check_fail "MCP config missing: $MCP_CONFIG"
+    fi
+
+    if [[ "${SERVER_MODELS_MAX:-1}" =~ ^[0-9]+$ ]]; then
+        check_ok "router max models valid: $SERVER_MODELS_MAX"
+    else
+        check_fail "invalid SERVER_MODELS_MAX: ${SERVER_MODELS_MAX:-unset}"
+    fi
+
+    if [[ "${SERVER_START_TIMEOUT:-}" =~ ^[0-9]+$ ]] &&
+        (( SERVER_START_TIMEOUT > 0 )); then
+        check_ok "server start timeout valid: ${SERVER_START_TIMEOUT}s"
+    else
+        check_fail "invalid SERVER_START_TIMEOUT: ${SERVER_START_TIMEOUT:-unset}"
+    fi
+
+    if validate_aliases; then
+        check_ok "model aliases valid"
+    else
+        check_fail "model aliases invalid"
     fi
 
     if [[ -n "${AGENT_WORKSPACE:-}" ]]; then
@@ -731,6 +787,50 @@ config_server_port() {
     info "Server port set to: $value"
 }
 
+config_router_max() {
+    local value
+    value="$(prompt_value "Max router models loaded at once" "${SERVER_MODELS_MAX:-1}")"
+    [[ -n "$value" ]] || return 0
+    _validate_set SERVER_MODELS_MAX "$value" || return $?
+    config_set SERVER_MODELS_MAX "$value"
+    info "Router max models set to: $value"
+}
+
+config_start_timeout() {
+    local value
+    value="$(prompt_value "Server start timeout (seconds)" "${SERVER_START_TIMEOUT:-180}")"
+    [[ -n "$value" ]] || return 0
+    _validate_set SERVER_START_TIMEOUT "$value" || return $?
+    config_set SERVER_START_TIMEOUT "$value"
+    info "Server start timeout set to: ${value}s"
+}
+
+config_opencode_provider() {
+    local value
+    value="$(prompt_value "OpenCode provider ID" "${OPENCODE_PROVIDER_ID:-local}")"
+    [[ -n "$value" ]] || return 0
+    _validate_set OPENCODE_PROVIDER_ID "$value" || return $?
+    config_set OPENCODE_PROVIDER_ID "$value"
+    info "OpenCode provider ID set to: $value"
+}
+
+config_opencode_max_output() {
+    local value
+    value="$(prompt_value "OpenCode max output tokens" "${OPENCODE_MAX_OUTPUT:-8192}")"
+    [[ -n "$value" ]] || return 0
+    _validate_set OPENCODE_MAX_OUTPUT "$value" || return $?
+    config_set OPENCODE_MAX_OUTPUT "$value"
+    info "OpenCode max output set to: $value"
+}
+
+config_model_aliases() {
+    local value
+    value="$(prompt_value "Model aliases (alias=model,...)" "${MODEL_ALIASES:-}")"
+    _validate_set MODEL_ALIASES "$value" || return $?
+    config_set MODEL_ALIASES "$value"
+    info "Model aliases set to: ${value:-(none)}"
+}
+
 config_tools() {
     require_fzf
     local selection
@@ -824,6 +924,13 @@ ${BOLD}Shortcuts${NC}
   llm config tools                Agent tools
   llm config workspace            Agent workspace
   llm config mcp                  MCP config
+
+${BOLD}OpenCode / Router${NC}
+  llm models alias <alias> <model> Set a readable model alias
+  llm models aliases              List aliases
+  llm config set SERVER_MODELS_MAX 1
+  llm config set OPENCODE_PROVIDER_ID local
+  llm config set OPENCODE_MAX_OUTPUT 8192
 
 ${BOLD}Keys${NC}
   $CONFIG_KEYS

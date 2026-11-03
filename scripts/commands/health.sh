@@ -119,6 +119,16 @@ cmd_health() {
         fi
     fi
 
+    if [[ -n "${MODEL_ALIASES:-}" ]]; then
+        if validate_aliases; then
+            check_ok "model aliases valid"
+        else
+            check_fail "model aliases invalid"
+        fi
+    else
+        check_ok "no model aliases configured"
+    fi
+
     if [[ -f "${RUN_DIR:-$LLM_HOME/run}/server.pid" ]]; then
         check_ok "background server PID file present"
     fi
@@ -141,8 +151,8 @@ help_health() {
     cat <<EOF
 ${BOLD}llm health${NC}
 
-Check the configuration, llama.cpp binaries, models, devices,
-multi-GPU split settings, memory file, server paths, and fzf.
+Check the configuration, llama.cpp binaries, models, model aliases,
+devices, multi-GPU split settings, memory file, server paths, and fzf.
 
   llm health        Run checks (exit 1 if any fail)
   llm config check  Configuration-only checks

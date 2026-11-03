@@ -53,6 +53,13 @@ cmd_version() {
   else
     printf '  %-16s %s\n' "Agent tools" "unavailable"
   fi
+
+  if have_cmd "${LLAMA_SERVER_BIN:-}" &&
+    "${LLAMA_SERVER_BIN}" --help 2>&1 | grep -q -- "--models-preset"; then
+    printf '  %-16s %s\n' "Router mode" "supported"
+  else
+    printf '  %-16s %s\n' "Router mode" "unavailable"
+  fi
 }
 
 help_version() {
