@@ -733,6 +733,11 @@ validate_gpu_config() {
 
     if [[ -n "$csv" ]] && ! validate_device_list "$csv"; then
         err "Unknown device in DEVICE: $csv"
+        # The device listing drops backend stderr; surface a load failure so a
+        # wedged or broken backend is not mistaken for a bad device name.
+        local backend_err
+        backend_err="$("$LLAMA_BIN" --list-devices 2>&1 >/dev/null | grep -iE "failed to initialize|error" | head -3 || true)"
+        [[ -n "$backend_err" ]] && err "$backend_err"
         return 1
     fi
 

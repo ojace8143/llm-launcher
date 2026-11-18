@@ -34,12 +34,31 @@ models_list() {
         warn "No .gguf models found."
         return 0
     fi
-    printf '  %-18s %s\n' "Default" "${DEFAULT_MODEL:-(none)}"
+
+    # Map model filename to its configured codename (alias).
+    local -A codenames=()
+    local alias target
+    while IFS=$'\t' read -r alias target; do
+        [[ -n "$alias" && -n "$target" ]] || continue
+        codenames["${target##*/}"]="$alias"
+    done < <(model_alias_entries)
+
+    local default="${DEFAULT_MODEL:-(none)}"
+    local default_name=""
+    if [[ -n "${DEFAULT_MODEL:-}" ]]; then
+        default_name="${codenames[$DEFAULT_MODEL]:-}"
+    fi
+    [[ -n "$default_name" ]] && default+=" [$default_name]"
+    printf '  %-18s %s\n' "Default" "$default"
     echo
+
     local m marker
     for m in "${models[@]}"; do
         marker=""
-        [[ -f "$(profile_path "$m")" ]] && marker=" ${DIM}[profile]${NC}"
+        if [[ -n "${codenames[$m]:-}" ]]; then
+            marker+=" ${CYAN}[${codenames[$m]}]${NC}"
+        fi
+        [[ -f "$(profile_path "$m")" ]] && marker+=" ${DIM}[profile]${NC}"
         if [[ "$m" == "${DEFAULT_MODEL:-}" ]]; then
             printf '  %s* %s%s%s\n' "$GREEN" "$m" "$NC" "$marker"
         else
