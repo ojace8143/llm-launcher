@@ -70,6 +70,7 @@ ${CYAN}::${NC} ${BOLD}Server${NC}
   llm serve --all             Expose every installed model (router mode)
   llm serve --background      Start in the background
   llm serve status|stop|logs  Manage the background server
+  llm serve logs --raw        Show the raw llama.cpp log
 
 ${CYAN}::${NC} ${BOLD}OpenCode${NC}
   llm opencode config         Print an OpenCode provider snippet

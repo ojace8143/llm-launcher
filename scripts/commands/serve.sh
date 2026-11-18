@@ -5,6 +5,8 @@ server_pid_file() { printf '%s/server.pid\n' "${RUN_DIR:-$LLM_HOME/run}"; }
 server_meta_file() { printf '%s/server.meta\n' "${RUN_DIR:-$LLM_HOME/run}"; }
 server_preset_file() { printf '%s/models.ini\n' "${RUN_DIR:-$LLM_HOME/run}"; }
 server_log_file() { printf '%s/server.log\n' "${LOG_DIR:-$LLM_HOME/logs}"; }
+server_raw_log_file() { printf '%s/server.raw.log\n' "${LOG_DIR:-$LLM_HOME/logs}"; }
+server_fifo_file() { printf '%s/server.log.fifo\n' "${RUN_DIR:-$LLM_HOME/run}"; }
 
 pid_is_llama_server() {
     local pid="$1"
@@ -93,9 +95,9 @@ wait_for_server() {
 }
 
 write_server_meta() {
-    local mode="$1" port="$2" model="$3" url="$4" logfile="$5"
-    printf '%s\t%s\t%s\t%s\t%s\n' \
-        "$mode" "$port" "$model" "$url" "$logfile" >"$(server_meta_file)"
+    local mode="$1" port="$2" model="$3" url="$4" logfile="$5" rawlog="$6"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$mode" "$port" "$model" "$url" "$logfile" "$rawlog" >"$(server_meta_file)"
 }
 
 read_server_meta() {
@@ -104,15 +106,19 @@ read_server_meta() {
     META_MODEL=""
     META_URL=""
     META_LOG=""
+    META_LOG_RAW=""
     local metafile
     metafile="$(server_meta_file)"
     [[ -f "$metafile" ]] || return 1
-    IFS=$'\t' read -r META_MODE META_PORT META_MODEL META_URL META_LOG <"$metafile" || true
+    IFS=$'\t' read -r META_MODE META_PORT META_MODEL META_URL META_LOG META_LOG_RAW <"$metafile" || true
+    if [[ -z "${META_LOG_RAW:-}" && -n "${META_LOG:-}" ]]; then
+        META_LOG_RAW="${META_LOG%.log}.raw.log"
+    fi
     return 0
 }
 
 clear_server_state() {
-    rm -f "$(server_pid_file)" "$(server_meta_file)"
+    rm -f "$(server_pid_file)" "$(server_meta_file)" "$(server_fifo_file)"
 }
 
 cmd_serve() {
@@ -136,7 +142,7 @@ cmd_serve() {
 # Internal: build and run the server.
 cmd_serve_run() {
     local background=0 open_browser=0 no_ui=0 dry_run=0
-    local router=0 no_tools=0
+    local router=0 no_tools=0 raw=0
     local model_query=""
     local tools_override="" agent_mode="" key_override="" host_override=""
     local port_override="" workspace="${AGENT_WORKSPACE:-$PWD}"
@@ -151,6 +157,7 @@ cmd_serve_run() {
             --no-open) open_browser=0 ;;
             --no-ui|--no-webui) no_ui=1 ;;
             --dry-run) dry_run=1 ;;
+            --raw) raw=1 ;;
             --all|--router) router=1 ;;
             --no-tools) no_tools=1; tools_override=""; agent_mode="false" ;;
             --agent) agent_mode="true" ;;
@@ -322,11 +329,13 @@ cmd_serve_run() {
         return 2
     fi
 
-    local url pidfile metafile logfile preset_path
+    local url pidfile metafile logfile rawlog fifo preset_path
     url="$(server_url)"
     pidfile="$(server_pid_file)"
     metafile="$(server_meta_file)"
     logfile="$(server_log_file)"
+    rawlog="$(server_raw_log_file)"
+    fifo="$(server_fifo_file)"
     preset_path="$(server_preset_file)"
 
     local -a args=()
@@ -412,51 +421,87 @@ cmd_serve_run() {
     if [[ -n "$sandbox" ]]; then
         info "Sandbox: $sandbox"
     fi
+    info "Log:     $logfile"
+    info "Raw log: $rawlog"
+    info "Rotation: $(log_rotation_label)"
+
+    local log_mode="clean"
+    (( raw )) && log_mode="raw"
+
+    # Older versions wrote the raw stream to server.log. Keep that history.
+    if [[ ! -e "$rawlog" && -s "$logfile" ]]; then
+        mv "$logfile" "$rawlog"
+    fi
+    # Keep both files bounded even if an earlier run grew them past the limit.
+    log_rotate "$rawlog" || true
+    log_rotate "$logfile" || true
+    printf '===== %s =====\n' "$(date -Is)" >>"$rawlog"
+    printf '===== %s =====\n' "$(date -Is)" >>"$logfile"
+
+    rm -f "$fifo" 2>/dev/null || true
+    if ! mkfifo -m 600 "$fifo" 2>/dev/null; then
+        die "Unable to create log FIFO: $fifo"
+    fi
+
+    local filter_pid
+    if (( background )); then
+        (
+            trap '' HUP
+            log_tee_stream "$rawlog" <"$fifo" | log_filter_stream "$logfile" "$log_mode"
+            rm -f "$fifo"
+        ) >/dev/null 2>&1 &
+    else
+        (
+            trap '' HUP
+            log_tee_stream "$rawlog" <"$fifo" | log_filter_stream "$logfile" "$log_mode"
+            rm -f "$fifo"
+        ) &
+    fi
+    filter_pid=$!
 
     if (( background )); then
         (
             cd "$workspace" || exit 1
-            printf '===== %s =====\n' "$(date -Is)"
             if have_cmd nohup; then
                 exec nohup "$LLAMA_SERVER_BIN" "${args[@]}"
             else
                 exec "$LLAMA_SERVER_BIN" "${args[@]}"
             fi
-        ) >"$logfile" 2>&1 &
+        ) >"$fifo" 2>&1 &
         local pid=$!
         printf '%s\n' "$pid" >"$pidfile"
         write_server_meta "$([[ $router -eq 1 ]] && echo router || echo single)" \
-            "$SERVER_PORT" "$model_desc" "$url" "$logfile"
+            "$SERVER_PORT" "$model_desc" "$url" "$logfile" "$rawlog"
         info "Started in background (PID $pid)"
-        info "Log: $logfile"
 
         if wait_for_server "$url" "$pid"; then
             info "Server is ready."
             (( open_browser )) && open_url "$url"
         else
-            err "Server did not become ready. Check $logfile"
+            err "Server did not become ready. Check $rawlog"
             if kill -0 "$pid" 2>/dev/null; then
                 kill "$pid" 2>/dev/null || true
             fi
             clear_server_state
-            tail -n 20 "$logfile" >&2 2>/dev/null || true
+            tail -n 20 "$rawlog" >&2 2>/dev/null || true
             return 1
         fi
         return 0
     fi
 
-    printf '===== %s =====\n' "$(date -Is)" >>"$logfile"
     cd "$workspace" || die "Unable to cd to $workspace"
-    "$LLAMA_SERVER_BIN" "${args[@]}" > >(tee -a "$logfile") 2>&1 &
+    "$LLAMA_SERVER_BIN" "${args[@]}" >"$fifo" 2>&1 &
     local fg_pid=$!
     printf '%s\n' "$fg_pid" >"$pidfile"
     write_server_meta "$([[ $router -eq 1 ]] && echo router || echo single)" \
-        "$SERVER_PORT" "$model_desc" "$url" "$logfile"
+        "$SERVER_PORT" "$model_desc" "$url" "$logfile" "$rawlog"
 
     foreground_cleanup() {
         trap - INT TERM EXIT
         kill "$fg_pid" 2>/dev/null || true
         wait "$fg_pid" 2>/dev/null || true
+        wait "$filter_pid" 2>/dev/null || true
+        rm -f "$fifo"
         clear_server_state
     }
     trap foreground_cleanup INT TERM EXIT
@@ -465,12 +510,14 @@ cmd_serve_run() {
         info "Server is ready."
         (( open_browser )) && open_url "$url"
     else
-        warn "Server did not become ready. Check $logfile"
+        warn "Server did not become ready. Check $rawlog"
     fi
 
     local rc=0
     wait "$fg_pid" || rc=$?
     trap - INT TERM EXIT
+    wait "$filter_pid" 2>/dev/null || true
+    rm -f "$fifo"
     clear_server_state
     return "$rc"
 }
@@ -532,6 +579,7 @@ cmd_serve_status() {
             warn "Health endpoint not responding"
         fi
         [[ -n "${META_LOG:-}" ]] && info "Log: ${META_LOG}"
+        [[ -n "${META_LOG_RAW:-}" ]] && info "Raw: ${META_LOG_RAW}"
         if [[ "${META_MODE:-}" == "router" && -f "$(server_preset_file)" ]]; then
             info "Preset: $(server_preset_file)"
         fi
@@ -547,18 +595,38 @@ cmd_serve_status() {
             info "Not running"
         fi
         [[ -n "${META_LOG:-}" && -f "${META_LOG:-}" ]] && info "Last log: $META_LOG"
+        [[ -n "${META_LOG_RAW:-}" && -f "${META_LOG_RAW:-}" ]] && info "Last raw: $META_LOG_RAW"
     fi
     return 0
 }
 
 cmd_serve_logs() {
-    local follow=0
-    [[ "${1:-}" == "-f" || "${1:-}" == "--follow" ]] && follow=1
+    local follow=0 raw=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--follow) follow=1 ;;
+            --raw) raw=1 ;;
+            -h|--help)
+                printf 'Usage: llm serve logs [-f|--follow] [--raw]\n'
+                return 0
+                ;;
+            *)
+                err "Unknown logs option: $1"
+                return 2
+                ;;
+        esac
+        shift
+    done
     local logfile
-    logfile="$(server_log_file)"
+    if (( raw )); then
+        logfile="$(server_raw_log_file)"
+    else
+        logfile="$(server_log_file)"
+    fi
     [[ -f "$logfile" ]] || die "No log file at $logfile"
     if (( follow )); then
-        tail -f "$logfile"
+        # -F reopens the file after rotation instead of following the old inode.
+        tail -F "$logfile"
     else
         tail -n 200 "$logfile"
     fi
@@ -578,8 +646,11 @@ ${BOLD}Lifecycle${NC}
   llm serve --background        Run in the background
   llm serve status              Show PID, mode, and health
   llm serve stop                Stop the background server
-  llm serve logs [-f]           Show the server log
+  llm serve logs [-f]           Show the clean server log
+  llm serve logs --raw          Show the raw llama.cpp log
   llm serve restart             Restart with the same arguments
+
+Logs rotate at 50 MiB and keep three older copies (server.log.1 .. .3).
 
 ${BOLD}Options${NC}
   --model NAME                  Model to serve (default: DEFAULT_MODEL)
@@ -599,6 +670,7 @@ ${BOLD}Options${NC}
   --no-ui                       Disable the Web UI
   --open                        Open the Web UI in a browser
   --background, -b              Run in the background
+  --raw                         Show raw llama.cpp output (clean by default)
   --dry-run                     Print the command instead of running it
   -c, --ctx N                   Override context size
       --ngl N                   Override GPU layers

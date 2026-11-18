@@ -845,7 +845,7 @@ preset_runtime_lines() {
     [[ -n "${THREADS:-}" ]] && printf 'threads = %s\n' "$THREADS"
     [[ -n "${THREADS_BATCH:-}" ]] && printf 'threads-batch = %s\n' "$THREADS_BATCH"
     [[ -n "${FLASH_ATTN:-}" ]] && printf 'flash-attn = %s\n' "$FLASH_ATTN"
-    [[ -n "${PARALLEL:-}" && "${PARALLEL}" != "1" ]] && printf 'parallel = %s\n' "$PARALLEL"
+    [[ -n "${PARALLEL:-}" ]] && printf 'parallel = %s\n' "$PARALLEL"
 
     if [[ -n "${DEVICE:-}" ]]; then
         if device_is_cpu "$DEVICE"; then
@@ -930,6 +930,9 @@ build_server_args() {
     local -n out="$out_var"
 
     build_llama_args "$out_var" "$model"
+
+    # build_runtime_args skips -np for 1 because llama-cli has no slots.
+    [[ "${PARALLEL:-}" == "1" ]] && out+=(-np 1)
 
     out+=(--host "${SERVER_HOST:-127.0.0.1}" --port "${SERVER_PORT:-9931}")
     [[ -n "${SERVER_API_KEY:-}" ]] && out+=(--api-key "$SERVER_API_KEY")

@@ -290,6 +290,29 @@ llm serve stop
 llm serve restart
 ```
 
+### Logs
+
+`llama-server` output is reformatted for the terminal: timestamps and slot
+bookkeeping are dropped, progress is shown as a percentage, and timings are
+summarized. The full stream is always kept on disk:
+
+- `logs/server.log` - clean view
+- `logs/server.raw.log` - untouched llama.cpp output
+
+```bash
+llm serve --raw           # raw output on the terminal
+llm serve logs            # clean log
+llm serve logs --raw      # raw log
+llm serve logs -f --raw   # follow the raw log
+```
+
+`--raw` changes only the terminal view; both files are still written.
+
+Both files rotate at 50 MiB and keep three older copies (`server.log.1` through
+`server.log.3`, same for `server.raw.log`), so a long-running server cannot fill
+the disk with logs. Override the limit with `LLM_LOG_MAX_BYTES` and the copy
+count with `LLM_LOG_KEEP`.
+
 The server listens on `127.0.0.1:9931` by default and exposes an
 OpenAI-compatible API at `/v1`, plus the llama.cpp Web UI.
 

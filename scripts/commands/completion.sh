@@ -24,7 +24,7 @@ _llm_complete() {
             COMPREPLY=( $(compgen -W "show edit get set unset reset path open check default device split tensor-split main-gpu cuda context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp" -- "$cur") )
             ;;
         serve)
-            COMPREPLY=( $(compgen -W "status stop logs restart --background --open --no-open --all --router --agent --tools --no-tools --mcp --sandbox --model --alias --models-max --memory-margin --host --port --api-key --workspace --no-ui --dry-run --device --split-mode --tensor-split --parallel --ctx --ngl" -- "$cur") )
+            COMPREPLY=( $(compgen -W "status stop logs restart --background --open --no-open --all --router --agent --tools --no-tools --mcp --sandbox --model --alias --models-max --memory-margin --host --port --api-key --workspace --no-ui --raw --dry-run --device --split-mode --tensor-split --parallel --ctx --ngl" -- "$cur") )
             ;;
         opencode)
             COMPREPLY=( $(compgen -W "config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output" -- "$cur") )
@@ -74,7 +74,7 @@ _llm() {
     case "${words[2]}" in
         config) _values 'config' show edit get set unset reset path open check default device split tensor-split main-gpu cuda context ngl threads flash parallel temp top-p extra-args memory host port api-key tools workspace mcp ;;
         models) _values 'models' list default info config add remove download alias aliases ;;
-        serve) _values 'serve' status stop logs restart --background --open --all --router --agent --tools --no-tools --model --alias --models-max --memory-margin --host --port --workspace --mcp --sandbox --no-ui --dry-run ;;
+        serve) _values 'serve' status stop logs restart --background --open --all --router --agent --tools --no-tools --model --alias --models-max --memory-margin --host --port --workspace --mcp --sandbox --no-ui --raw --dry-run ;;
         opencode) _values 'opencode' config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output ;;
         agent) _values 'agent' --workspace --shell --full --tools --mcp --sandbox --model --port --host --no-open --background --dry-run ;;
         bench) _values 'bench' --model --devices --contexts --ngl --threads --reps --warmup --delay --baseline --cooldown --quick --compare --json --csv --save --dry-run --parallel ;;
