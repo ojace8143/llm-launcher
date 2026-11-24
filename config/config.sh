@@ -71,6 +71,8 @@ fi
 : "${MODEL_ALIASES:=}"
 : "${OPENCODE_PROVIDER_ID:=local}"
 : "${OPENCODE_MAX_OUTPUT:=8192}"
+: "${PI_PROVIDER_ID:=local}"
+: "${PI_MAX_OUTPUT:=8192}"
 
 : "${RUN_DIR:=$LLM_HOME/run}"
 : "${LOG_DIR:=$LLM_HOME/logs}"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # `llm config` — view and change configuration.
 
-CONFIG_KEYS="DEFAULT_MODEL MODEL_DIR LLAMA_HOME LLAMA_BIN LLAMA_SERVER_BIN CUDA_HOME MEMORY_DIR MEMORY_FILE MEMORY_ENABLED CONTEXT_SIZE NGL THREADS THREADS_BATCH FLASH_ATTN PARALLEL TEMP TOP_P EXTRA_ARGS DEVICE SPLIT_MODE TENSOR_SPLIT MAIN_GPU FIT SERVER_HOST SERVER_PORT SERVER_API_KEY SERVER_TOOLS SERVER_AGENT AGENT_WORKSPACE MCP_CONFIG SERVER_MODELS_MAX SERVER_MEMORY_MARGIN SERVER_START_TIMEOUT MODEL_ALIASES OPENCODE_PROVIDER_ID OPENCODE_MAX_OUTPUT RUN_DIR LOG_DIR"
+CONFIG_KEYS="DEFAULT_MODEL MODEL_DIR LLAMA_HOME LLAMA_BIN LLAMA_SERVER_BIN CUDA_HOME MEMORY_DIR MEMORY_FILE MEMORY_ENABLED CONTEXT_SIZE NGL THREADS THREADS_BATCH FLASH_ATTN PARALLEL TEMP TOP_P EXTRA_ARGS DEVICE SPLIT_MODE TENSOR_SPLIT MAIN_GPU FIT SERVER_HOST SERVER_PORT SERVER_API_KEY SERVER_TOOLS SERVER_AGENT AGENT_WORKSPACE MCP_CONFIG SERVER_MODELS_MAX SERVER_MEMORY_MARGIN SERVER_START_TIMEOUT MODEL_ALIASES OPENCODE_PROVIDER_ID OPENCODE_MAX_OUTPUT PI_PROVIDER_ID PI_MAX_OUTPUT RUN_DIR LOG_DIR"
 
 cmd_config() {
     local sub="${1:-}"
@@ -130,6 +130,10 @@ config_show() {
     config_row "Max output" "${OPENCODE_MAX_OUTPUT:-8192}"
     config_row "Model aliases" "${MODEL_ALIASES:-(none)}"
 
+    section "pi"
+    config_row "Provider ID" "${PI_PROVIDER_ID:-local}"
+    config_row "Max output" "${PI_MAX_OUTPUT:-8192}"
+
     section "Per-model"
     local profile_count=0 m profile
     while IFS= read -r m; do
@@ -222,6 +226,8 @@ config_edit() {
             "OpenCode: provider ID") config_opencode_provider ;;
             "OpenCode: max output tokens") config_opencode_max_output ;;
             "OpenCode: model aliases") config_model_aliases ;;
+            "pi: provider ID") config_pi_provider ;;
+            "pi: max output tokens") config_pi_max_output ;;
             "Maintenance: show config") config_show ;;
             "Maintenance: check config") config_check || true ;;
             ""|"Exit") return 0 ;;
@@ -253,16 +259,16 @@ _validate_set() {
         SERVER_MODELS_MAX|SERVER_MEMORY_MARGIN)
             _require_number "$key" "$value" || return 2
             ;;
-        SERVER_START_TIMEOUT|OPENCODE_MAX_OUTPUT)
+        SERVER_START_TIMEOUT|OPENCODE_MAX_OUTPUT|PI_MAX_OUTPUT)
             _require_number "$key" "$value" || return 2
             (( value > 0 )) || {
                 err "$key must be greater than zero"
                 return 2
             }
             ;;
-        OPENCODE_PROVIDER_ID)
+        OPENCODE_PROVIDER_ID|PI_PROVIDER_ID)
             [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
-                err "OPENCODE_PROVIDER_ID must use letters, numbers, dot, underscore, or dash"
+                err "$key must use letters, numbers, dot, underscore, or dash"
                 return 2
             }
             ;;
@@ -817,6 +823,24 @@ config_opencode_max_output() {
     info "OpenCode max output set to: $value"
 }
 
+config_pi_provider() {
+    local value
+    value="$(prompt_value "pi provider ID" "${PI_PROVIDER_ID:-local}")"
+    [[ -n "$value" ]] || return 0
+    _validate_set PI_PROVIDER_ID "$value" || return $?
+    config_set PI_PROVIDER_ID "$value"
+    info "pi provider ID set to: $value"
+}
+
+config_pi_max_output() {
+    local value
+    value="$(prompt_value "pi max output tokens" "${PI_MAX_OUTPUT:-8192}")"
+    [[ -n "$value" ]] || return 0
+    _validate_set PI_MAX_OUTPUT "$value" || return $?
+    config_set PI_MAX_OUTPUT "$value"
+    info "pi max output set to: $value"
+}
+
 config_model_aliases() {
     local value
     value="$(prompt_value "Model aliases (alias=model,...)" "${MODEL_ALIASES:-}")"
@@ -919,12 +943,14 @@ ${BOLD}Shortcuts${NC}
   llm config workspace            Agent workspace
   llm config mcp                  MCP config
 
-${BOLD}OpenCode / Router${NC}
+${BOLD}Agent clients / Router${NC}
   llm models alias <alias> <model> Set a readable model alias
   llm models aliases              List aliases
   llm config set SERVER_MODELS_MAX 1
   llm config set OPENCODE_PROVIDER_ID local
   llm config set OPENCODE_MAX_OUTPUT 8192
+  llm config set PI_PROVIDER_ID local
+  llm config set PI_MAX_OUTPUT 8192
 
 ${BOLD}Per-model${NC}
   llm models config               Pick a model and edit its settings

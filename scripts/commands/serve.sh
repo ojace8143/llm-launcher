@@ -683,7 +683,8 @@ ${BOLD}Options${NC}
 ${DIM}Router mode reads per-model context and GPU settings from
 config/profiles/<model>.sh. Edit them with 'llm models config'. Server options
 such as host, port, and tools remain global. Configure aliases with
-'llm models alias' and generate an OpenCode provider with 'llm opencode config'.${NC}
+'llm models alias' and generate providers with 'llm opencode config' or
+'llm pi config'.${NC}
 
 ${DIM}The server binds to loopback. Set SERVER_API_KEY before exposing it.${NC}
 EOF

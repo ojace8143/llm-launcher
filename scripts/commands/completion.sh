@@ -14,7 +14,7 @@ completion_bash() {
     cat <<'EOF'
 _llm_complete() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="help launch config health version models devices serve opencode agent setup completion bench"
+    local commands="help launch config health version models devices serve opencode pi agent setup completion bench"
     if (( COMP_CWORD == 1 )); then
         COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
         return
@@ -28,6 +28,9 @@ _llm_complete() {
             ;;
         opencode)
             COMPREPLY=( $(compgen -W "config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output" -- "$cur") )
+            ;;
+        pi)
+            COMPREPLY=( $(compgen -W "config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output --reasoning" -- "$cur") )
             ;;
         agent)
             COMPREPLY=( $(compgen -W "--workspace --shell --full --tools --mcp --sandbox --model --port --host --api-key --no-open --background --dry-run" -- "$cur") )
@@ -62,6 +65,7 @@ _llm() {
         'devices:List devices'
         'serve:Run llama-server'
         'opencode:Generate OpenCode provider configuration'
+        'pi:Generate pi provider configuration'
         'agent:Run the Web UI agent'
         'setup:Run setup.sh'
         'completion:Generate shell completion'
@@ -76,6 +80,7 @@ _llm() {
         models) _values 'models' list default info config add remove download alias aliases ;;
         serve) _values 'serve' status stop logs restart --background --open --all --router --agent --tools --no-tools --model --alias --models-max --memory-margin --host --port --workspace --mcp --sandbox --no-ui --raw --dry-run ;;
         opencode) _values 'opencode' config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output ;;
+        pi) _values 'pi' config merge --write --merge --yes --dry-run --output --model --provider --name --host --port --max-output --reasoning ;;
         agent) _values 'agent' --workspace --shell --full --tools --mcp --sandbox --model --port --host --no-open --background --dry-run ;;
         bench) _values 'bench' --model --devices --contexts --ngl --threads --reps --warmup --delay --baseline --cooldown --quick --compare --json --csv --save --dry-run --parallel ;;
     esac

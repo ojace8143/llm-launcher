@@ -525,7 +525,7 @@ opencode_render_config() {
     local -a files=()
     if [[ -n "$model_query" ]]; then
         local resolved
-        resolved="$(resolve_model "$model_query")" || {
+        resolved="$(resolve_model_or_alias "$model_query")" || {
             err "Model not found: $model_query"
             return 1
         }
@@ -594,7 +594,10 @@ opencode_render_config() {
     fi
     printf '      "package": "@opencode/ai/providers/openai-compatible",\n'
     printf '      "settings": {\n'
-    printf '        "baseURL": "%s"\n' "$(opencode_json_escape "$base_url")"
+    printf '        "baseURL": "%s",\n' "$(opencode_json_escape "$base_url")"
+    printf '        "headerTimeout": false,\n'
+    printf '        "chunkTimeout": 300000,\n'
+    printf '        "timeout": false\n'
     printf '      },\n'
     printf '      "models": {\n'
 
@@ -655,6 +658,9 @@ ${BOLD}Recommended setup${NC}
 ${DIM}OpenCode does not auto-discover custom OpenAI-compatible providers, so the
 generated snippet lists each model explicitly. If SERVER_API_KEY is set, the
 snippet uses LLM_LOCAL_API_KEY; export it before starting OpenCode.${NC}
+
+${DIM}Provider settings disable the request and header timeouts and keep a
+five-minute chunk timeout, so long local prefill does not abort the stream.${NC}
 
 ${DIM}--write never overwrites an existing config. --merge preserves unrelated
 settings and models, creates a timestamped backup, and writes atomically.

@@ -14,8 +14,8 @@ Note: original project was created a few months ago, and llama.cpp has progresse
 - Linux with a bash shell
 - `git`, `cmake`, `make`, a C++ compiler (`g++` or `clang++`), `curl`, `fzf`
 - Optional: CUDA toolkit (`nvcc`) and/or a Vulkan runtime for GPU builds
-- Optional: OpenCode for the local OpenAI-compatible provider setup
-- Optional: `python3` if you use `llm opencode merge`
+- Optional: OpenCode or pi for the local OpenAI-compatible provider setup
+- Optional: `python3` if you use `llm opencode merge` or `llm pi merge`
 
 `setup.sh` can install the basic dependencies on xbps, pacman, emerge, and
 apt-based systems. (More support should come later)
@@ -81,6 +81,8 @@ llm serve                    Run llama-server (OpenAI-compatible API + UI)
 llm serve --all              Serve every installed model (router mode)
 llm opencode config          Print an OpenCode provider snippet
 llm opencode merge           Merge it into an existing OpenCode config
+llm pi config                Print a pi provider snippet
+llm pi merge                 Merge it into ~/.pi/agent/models.json
 llm agent                    Web UI agent with read/search/edit tools
 
 llm models list              List local models
@@ -105,6 +107,7 @@ llm models config coder set CONTEXT_SIZE 32768
 llm models config general set DEVICE CUDA0,Vulkan1
 llm serve --all --background --no-tools
 llm opencode merge
+llm pi merge
 llm health
 ```
 
@@ -252,8 +255,8 @@ Behavior worth knowing:
   profiles. Server options such as host, port, API key, and tools remain global.
 - `llm serve <model>` and `llm launch <model>` load the profile after the global
   configuration.
-- `llm opencode config` uses the per-model context size when generating
-  OpenCode model limits.
+- `llm opencode config` and `llm pi config` use the per-model context size when
+  generating model limits.
 
 `llm config check` validates every profile, and `llm serve --all --dry-run`
 prints the generated preset.
@@ -344,8 +347,8 @@ llm serve --all --background --no-tools
 ```
 
 Aliases become preset section names, `--alias` values for single-model mode,
-and OpenCode model IDs. Without an alias, the GGUF filename stem is sanitized
-and used as the model ID.
+and OpenCode or pi model IDs. Without an alias, the GGUF filename stem is
+sanitized and used as the model ID.
 
 Router mode applies each model's profile when it loads that model, so context,
 device, split, and generation settings can differ per model. Configure them with
@@ -473,6 +476,89 @@ Start llm-launcher with the same `SERVER_API_KEY`.
 - Changing models in OpenCode may trigger a load and unload cycle. This is
   normal in router mode.
 
+## pi integration
+
+pi (pi.dev) reads providers from `~/.pi/agent/models.json`. The launcher
+generates the same provider for every alias:
+
+```bash
+llm models alias coder Qwen3.6-35B-A3B-UD-IQ4_XS.gguf
+llm serve coder --background
+llm pi merge
+pi --provider local --model coder
+```
+
+`llm pi config` prints a valid snippet without touching anything:
+
+```bash
+llm pi merge                   # merge into ~/.pi/agent/models.json
+llm pi config --merge --yes    # non-interactive
+llm pi config --merge --dry-run
+llm pi config --write          # write only if no models.json exists
+llm pi config --output FILE    # write or merge at FILE
+llm pi config --model NAME     # one model instead of all
+llm pi config --reasoning      # mark models as supporting thinking
+```
+
+The generated provider looks like this:
+
+```jsonc
+{
+  "$schema": "https://pi.dev/schemas/models.schema.json",
+  "providers": {
+    "local": {
+      "name": "llama.cpp (local)",
+      "baseUrl": "http://127.0.0.1:9931/v1",
+      "api": "openai-completions",
+      "apiKey": "llm-local",
+      "models": [
+        {
+          "id": "coder",
+          "name": "coder (Qwen3.6-35B-A3B-UD-IQ4_XS)",
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 8192
+        }
+      ]
+    }
+  }
+}
+```
+
+Merge behavior matches the OpenCode integration: unrelated providers and
+models are preserved, entries are merged by `id`, a timestamped backup is
+created, and the write is atomic. `models` is an array in pi, not an object.
+
+### API key
+
+If `SERVER_API_KEY` is set, the provider uses `$LLM_LOCAL_API_KEY` and
+`authHeader: true`:
+
+```jsonc
+"apiKey": "$LLM_LOCAL_API_KEY",
+"authHeader": true
+```
+
+Export it in the environment that launches pi:
+
+```bash
+export LLM_LOCAL_API_KEY='your-key'
+```
+
+Otherwise a literal placeholder (`llm-local`) is written, because pi requires
+a non-empty `apiKey` even when llama-server ignores it.
+
+### pi notes
+
+- `--reasoning` adds `"reasoning": true` to every model. Leave it off unless
+  the model's chat template emits thinking content that pi should display.
+- `maxTokens` defaults to `PI_MAX_OUTPUT` (8192) and is clamped to a quarter of
+  the model's context window.
+- pi reads `models.json` at startup, so rerun `llm pi merge` after changing
+  aliases or profiles.
+- pi resolves its agent directory from `PI_CODING_AGENT_DIR` when that is set;
+  `llm pi` writes to the same location.
+
 ## Agent mode
 
 `llm agent` starts the server with llama.cpp's built-in file tools and opens
@@ -518,6 +604,7 @@ SERVER_HOST    SERVER_PORT     SERVER_API_KEY
 SERVER_TOOLS   AGENT_WORKSPACE MCP_CONFIG
 SERVER_MODELS_MAX  SERVER_MEMORY_MARGIN  SERVER_START_TIMEOUT
 MODEL_ALIASES  OPENCODE_PROVIDER_ID  OPENCODE_MAX_OUTPUT
+PI_PROVIDER_ID  PI_MAX_OUTPUT
 ```
 
 Environment overrides are available for temporary changes:

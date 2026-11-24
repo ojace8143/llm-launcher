@@ -78,6 +78,12 @@ ${CYAN}::${NC} ${BOLD}OpenCode${NC}
   llm opencode config --merge Merge into an existing OpenCode config
   llm opencode merge          Alias for config --merge
 
+${CYAN}::${NC} ${BOLD}pi${NC}
+  llm pi config               Print a pi provider snippet
+  llm pi config --write       Write ~/.pi/agent/models.json
+  llm pi config --merge       Merge into ~/.pi/agent/models.json
+  llm pi merge                Alias for config --merge
+
 ${CYAN}::${NC} ${BOLD}Agent${NC}
   llm agent                   Web UI agent with read/search/edit tools
   llm agent --shell           Also allow shell commands
@@ -96,6 +102,7 @@ ${CYAN}::${NC} ${BOLD}Examples${NC}
   llm models config coder set CONTEXT_SIZE 32768
   llm serve --all --background --no-tools
   llm opencode merge
+  llm pi merge
   llm agent --workspace ~/Projects/my-app
   llm health
 

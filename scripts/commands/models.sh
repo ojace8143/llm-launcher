@@ -660,6 +660,6 @@ ${DIM}Profiles live in config/profiles/<model>.sh and override the global config
 for that model in both 'llm launch' and 'llm serve' (including router mode).${NC}
 
 ${DIM}Models directory: ${MODEL_DIR:-unset}${NC}
-${DIM}Aliases are used by llama-server and 'llm opencode config'.${NC}
+${DIM}Aliases are used by llama-server, 'llm opencode config', and 'llm pi config'.${NC}
 EOF
 }
