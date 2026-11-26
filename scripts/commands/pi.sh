@@ -609,10 +609,10 @@ ${BOLD}Merge options${NC}
   --dry-run                     Print the merged config, write nothing
 
 ${BOLD}Recommended setup${NC}
-  llm models alias coder my-coder.gguf
-  llm serve coder --background
+  llm models alias fast my-fast.gguf
+  llm serve fast --background
   llm pi merge
-  pi --provider local --model coder
+  pi --provider local --model fast
 
 ${DIM}pi reads providers from ~/.pi/agent/models.json. Each model is listed
 explicitly with its llama-server alias, context window, and output limit.

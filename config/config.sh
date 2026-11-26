@@ -17,7 +17,7 @@ fi
 : "${LLAMA_BIN:=$LLAMA_HOME/build/bin/llama-cli}"
 : "${LLAMA_SERVER_BIN:=$LLAMA_HOME/build/bin/llama-server}"
 
-# Optional custom CUDA toolkit (e.g. a runfile install under ~/Src)
+# Optional custom CUDA toolkit (e.g. a runfile install under ~/src)
 : "${CUDA_HOME:=}"
 if [[ -n "${CUDA_HOME:-}" ]]; then
     if [[ -d "$CUDA_HOME/bin" ]]; then

@@ -23,7 +23,7 @@ LLM_HOME="${LLM_HOME:-$(cd "$_COMMON_DIR/.." && pwd)}"
 export LLM_HOME
 
 LLM_CONFIG="${LLM_CONFIG:-$LLM_HOME/config/config.local.sh}"
-VERSION="${VERSION:-0.5.0}"
+VERSION="${VERSION:-0.5.1}"
 
 PROFILE_TOOLS="read_file,file_glob_search,grep_search,get_info,write_file,edit_file"
 ALL_TOOLS="read_file,file_glob_search,grep_search,get_info,write_file,edit_file,exec_shell_command"

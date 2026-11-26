@@ -650,8 +650,8 @@ ${BOLD}Merge options${NC}
   --dry-run                           Print the merged config, write nothing
 
 ${BOLD}Recommended setup${NC}
-  llm models alias coder my-coder.gguf
-  llm models alias general my-general.gguf
+  llm models alias fast my-fast.gguf
+  llm models alias deep my-deep.gguf
   llm serve --all --background --no-tools
   llm opencode merge
 

@@ -98,12 +98,12 @@ ${CYAN}::${NC} ${BOLD}Examples${NC}
   llm launch Qwen3-1.7B-Q4_K_M.gguf -- --temp 0.2
   llm launch --device CUDA0,CUDA1 --split-mode layer
   llm config set CONTEXT_SIZE 32768
-  llm models alias coder coding-model.gguf
-  llm models config coder set CONTEXT_SIZE 32768
+  llm models alias fast coding-model.gguf
+  llm models config fast set CONTEXT_SIZE 32768
   llm serve --all --background --no-tools
   llm opencode merge
   llm pi merge
-  llm agent --workspace ~/Projects/my-app
+  llm agent --workspace ~/projects/my-app
   llm health
 
 ${DIM}Run 'llm help <command>' for command-specific details.

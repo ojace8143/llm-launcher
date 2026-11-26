@@ -102,9 +102,9 @@ Examples:
 llm launch select
 llm launch Qwen3-1.7B-Q4_K_M.gguf -- --temp 0.2
 llm config set CONTEXT_SIZE 32768
-llm models alias coder Qwen3VL-8B-Instruct-Q4_K_M.gguf
-llm models config coder set CONTEXT_SIZE 32768
-llm models config general set DEVICE CUDA0,Vulkan1
+llm models alias fast Qwen3.6-35B-A3B-UD-IQ4_XS.gguf
+llm models config fast set CONTEXT_SIZE 131072
+llm models config deep set DEVICE CUDA0,Vulkan1
 llm serve --all --background --no-tools
 llm opencode merge
 llm pi merge
@@ -126,34 +126,34 @@ works when linked.
 ## CUDA toolkit outside the package manager
 
 If `nvcc` is not available from your distro repositories, install the NVIDIA
-runfile toolkit somewhere user-writable (for example `~/Src/cuda-13.2.2`):
+runfile toolkit somewhere user-writable (for example `~/src/cuda-13.2.2`):
 
 ```bash
 CUDA_VERSION=13.2.2
 CUDA_RUNFILE=cuda_${CUDA_VERSION}_595.71.05_linux.run
 
-mkdir -p ~/Src
-cd ~/Src
+mkdir -p ~/src
+cd ~/src
 curl -fLO "https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/local_installers/${CUDA_RUNFILE}"
 
 # --silent implies EULA acceptance; --toolkit skips the driver
 env -u DISPLAY sh "$CUDA_RUNFILE" \
   --silent --toolkit \
-  --toolkitpath="$HOME/Src/cuda-$CUDA_VERSION" \
+  --toolkitpath="$HOME/src/cuda-$CUDA_VERSION" \
   --no-opengl-libs --no-man-page --override \
-  --tmpdir="$HOME/Src/.cuda-tmp"
+  --tmpdir="$HOME/src/.cuda-tmp"
 ```
 
 Then point llm-launcher at it:
 
 ```bash
-llm config set CUDA_HOME "$HOME/Src/cuda-13.2.2"
+llm config set CUDA_HOME "$HOME/src/cuda-13.2.2"
 ./setup.sh --backend=cuda --fresh
 ```
 
 `CUDA_HOME` adds `$CUDA_HOME/bin` to `PATH` and `$CUDA_HOME/lib64` to
 `LD_LIBRARY_PATH` for setup and launches. Setup also auto-detects
-`~/Src/cuda-*/bin/nvcc` if `CUDA_HOME` is not set.
+`~/src/cuda-*/bin/nvcc` if `CUDA_HOME` is not set.
 
 ## Multi-GPU
 
@@ -202,8 +202,8 @@ Create or edit a profile interactively:
 
 ```bash
 llm models config                    # pick a model with fzf
-llm models config Qwen3VL-8B         # partial name works
-llm models config coder              # aliases work too
+llm models config Qwen3.6-35B        # partial name works
+llm models config deep               # aliases work too
 ```
 
 Scriptable commands:
@@ -221,20 +221,21 @@ Profiles live in `config/profiles/<model-name-without-.gguf>.sh` and are
 gitignored. A typical pair looks like this:
 
 ```bash
-# config/profiles/Qwen3VL-8B-Instruct-Q4_K_M.sh
-# Small model: everything on the 4060, 32k context.
-CONTEXT_SIZE=32768
+# config/profiles/Qwen3.6-35B-A3B-UD-IQ4_XS.sh
+# Fast model: 128k context, experts on CPU, 4060 only.
+CONTEXT_SIZE=131072
 DEVICE="CUDA0"
 NGL=99
+EXTRA_ARGS="--n-cpu-moe 32 -lm none --cache-ram 6144 --ctx-checkpoints 32"
 ```
 
 ```bash
-# config/profiles/Qwen3.8-27B-UD-Q4_K_M.sh
-# Large model: 40/60 across both GPUs, 256k context.
-CONTEXT_SIZE=262144
+# config/profiles/Qwen3.8-27B-UD-IQ4_XS.sh
+# Deep model: 50/50 across both GPUs, 92k context.
+CONTEXT_SIZE=94208
 DEVICE="CUDA0,Vulkan1"
 SPLIT_MODE="layer"
-TENSOR_SPLIT="40,60"
+TENSOR_SPLIT="50,50"
 NGL=99
 ```
 
@@ -341,8 +342,8 @@ is listed through `/v1/models` and can be requested by name. With
 is the sensible choice for an 8 GB GPU.
 
 ```bash
-llm models alias coder Qwen3VL-8B-Instruct-Q4_K_M.gguf
-llm models alias general Qwen3.8-27B-UD-Q4_K_M.gguf
+llm models alias fast Qwen3.6-35B-A3B-UD-IQ4_XS.gguf
+llm models alias deep Qwen3.8-27B-UD-IQ4_XS.gguf
 llm serve --all --background --no-tools
 ```
 
@@ -364,8 +365,8 @@ OpenCode can use the local server through its OpenAI-compatible provider
 package. The recommended setup is router mode plus explicit aliases:
 
 ```bash
-llm models alias coder Qwen3VL-8B-Instruct-Q4_K_M.gguf
-llm models alias general Qwen3.8-27B-UD-Q4_K_M.gguf
+llm models alias fast Qwen3.6-35B-A3B-UD-IQ4_XS.gguf
+llm models alias deep Qwen3.8-27B-UD-IQ4_XS.gguf
 llm serve --all --background --no-tools
 llm opencode merge
 ```
@@ -415,20 +416,20 @@ The generated provider looks like this:
         "baseURL": "http://127.0.0.1:9931/v1"
       },
       "models": {
-        "general": {
-          "name": "general (Qwen3.8-27B-UD-Q4_K_M)",
-          "modelID": "general",
-          "limit": { "context": 64000, "output": 8192 },
+        "deep": {
+          "name": "deep (Qwen3.8-27B-UD-IQ4_XS)",
+          "modelID": "deep",
+          "limit": { "context": 94208, "output": 8192 },
           "capabilities": {
             "tools": true,
             "input": ["text"],
             "output": ["text"]
           }
         },
-        "coder": {
-          "name": "coder (Qwen3VL-8B-Instruct-Q4_K_M)",
-          "modelID": "coder",
-          "limit": { "context": 64000, "output": 8192 },
+        "fast": {
+          "name": "fast (Qwen3.6-35B-A3B-UD-IQ4_XS)",
+          "modelID": "fast",
+          "limit": { "context": 131072, "output": 8192 },
           "capabilities": {
             "tools": true,
             "input": ["text"],
@@ -482,10 +483,10 @@ pi (pi.dev) reads providers from `~/.pi/agent/models.json`. The launcher
 generates the same provider for every alias:
 
 ```bash
-llm models alias coder Qwen3.6-35B-A3B-UD-IQ4_XS.gguf
-llm serve coder --background
+llm models alias fast Qwen3.6-35B-A3B-UD-IQ4_XS.gguf
+llm serve fast --background
 llm pi merge
-pi --provider local --model coder
+pi --provider local --model fast
 ```
 
 `llm pi config` prints a valid snippet without touching anything:
@@ -513,8 +514,8 @@ The generated provider looks like this:
       "apiKey": "llm-local",
       "models": [
         {
-          "id": "coder",
-          "name": "coder (Qwen3.6-35B-A3B-UD-IQ4_XS)",
+          "id": "fast",
+          "name": "fast (Qwen3.6-35B-A3B-UD-IQ4_XS)",
           "input": ["text"],
           "contextWindow": 131072,
           "maxTokens": 8192
@@ -566,7 +567,7 @@ the Web UI:
 
 ```bash
 llm agent
-llm agent --workspace ~/Projects/my-app
+llm agent --workspace ~/projects/my-app
 llm agent --shell                 # also allow shell commands
 llm agent --sandbox docker:ubuntu # run tools in a container
 llm agent --mcp config/mcp.example.json

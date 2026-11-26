@@ -94,7 +94,7 @@ log_render_line() {
                     prog="${body#*progress = }"; prog="${prog%%,*}"
                     tps="${body##*/ }"; tps="${tps%% tokens per second*}"
                     pct="$(_log_pct "$prog")"
-                    _log_set pp "[pp]" "${toks} tok ${pct}% ${tps} t/s"
+                    _log_set pp "[pp]" "${toks} tok ${pct}% ${tps} t/s ETA: $(_log_eta "$toks" "$prog" "$tps")"
                     ;;
                 *"n_gen = "*)
                     toks="${body#*n_gen = }"; toks="${toks%%,*}"; toks="${toks//[[:space:]]/}"
@@ -229,6 +229,34 @@ log_print_clean() {
     fi
 }
 
+# Map a LOG_KIND to its terminal color code.
+log_color_for_kind() {
+    case "${1:-raw}" in
+        info) printf '%s' "$GREEN" ;;
+        warn) printf '%s' "$YELLOW" ;;
+        err)  printf '%s' "$RED" ;;
+        dbg)  printf '%s' "$DIM" ;;
+        pp)   printf '%s' "$BLUE" ;;
+        gen)  printf '%s' "$CYAN" ;;
+        mtp)  printf '%s' "$MAGENTA" ;;
+        done) printf '%s' "$DIM" ;;
+        *)    printf '%s' "$NC" ;;
+    esac
+}
+
+# Compute ETA in seconds from total tokens, progress (0..1), and tokens-per-second speed.
+# Usage: _log_eta "$toks" "$prog" "$tps"
+# Output: "26.0s" (seconds, one decimal) or "--" (if rate is zero).
+_log_eta() {
+    local tokens="${1:-0}" progress="${2:-0}" rate="${3:-0}"
+    awk -v t="$tokens" -v p="$progress" -v r="$rate" 'BEGIN {
+        if (r+0 <= 0) { printf "%s", "--"; exit }
+        remaining = t * (1 - p)
+        if (remaining + 0 <= 0) { printf "%s", "0.0s"; exit }
+        printf "%.1fs", remaining / r
+    }'
+}
+
 # Log rotation: 50 MiB per file with three older copies kept.
 LLM_LOG_MAX_BYTES="${LLM_LOG_MAX_BYTES:-52428800}"
 LLM_LOG_KEEP="${LLM_LOG_KEEP:-3}"
@@ -328,7 +356,13 @@ log_filter_stream() {
         log_render_line "$line"
         (( LOG_KEEP )) || continue
         if [[ -n "${LOG_TAG:-}" ]]; then
-            printf '%s %s\n' "$LOG_TAG" "$LOG_TEXT" >>"$cleanfile" || true
+            local color=""
+            case "$LOG_KIND" in
+                info) color="$GREEN" ;; warn) color="$YELLOW" ;; err) color="$RED" ;;
+                dbg) color="$DIM" ;; pp) color="$BLUE" ;; gen) color="$CYAN" ;;
+                mtp) color="$MAGENTA" ;; done) color="$DIM" ;;
+            esac
+            printf '%s%s%s %s\n' "$color" "$LOG_TAG" "$NC" "$LOG_TEXT" >>"$cleanfile" || true
         else
             printf '%s\n' "$LOG_TEXT" >>"$cleanfile" || true
         fi

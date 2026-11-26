@@ -226,7 +226,7 @@ detect_backends() {
     # If CUDA_HOME is not configured, look in common user-local locations.
     if [[ -z "${CUDA_HOME:-}" ]]; then
         local cuda_dir
-        for cuda_dir in "$HOME"/Src/cuda-* /opt/cuda; do
+        for cuda_dir in "$HOME"/src/cuda-* /opt/cuda; do
             if [[ -x "$cuda_dir/bin/nvcc" ]]; then
                 CUDA_HOME="$cuda_dir"
                 export CUDA_HOME
