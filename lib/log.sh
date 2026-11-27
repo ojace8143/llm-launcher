@@ -244,14 +244,16 @@ log_color_for_kind() {
     esac
 }
 
-# Compute ETA in seconds from total tokens, progress (0..1), and tokens-per-second speed.
+# Compute ETA in seconds from cumulative processed tokens, progress (0..1), and tokens-per-second speed.
 # Usage: _log_eta "$toks" "$prog" "$tps"
 # Output: "26.0s" (seconds, one decimal) or "--" (if rate is zero).
+# Formula: total = t / p, remaining = total - t = t * (1 - p) / p, eta = remaining / r
 _log_eta() {
     local tokens="${1:-0}" progress="${2:-0}" rate="${3:-0}"
     awk -v t="$tokens" -v p="$progress" -v r="$rate" 'BEGIN {
         if (r+0 <= 0) { printf "%s", "--"; exit }
-        remaining = t * (1 - p)
+        if (p+0 <= 0) { printf "%s", "--"; exit }
+        remaining = t * (1 - p) / p
         if (remaining + 0 <= 0) { printf "%s", "0.0s"; exit }
         printf "%.1fs", remaining / r
     }'
